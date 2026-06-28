@@ -1,75 +1,57 @@
-# React + TypeScript + Vite
+# PlacementPilot AI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+AI-powered placement preparation platform with personalized roadmaps, daily missions, progress tracking, and adaptive learning.
 
-Currently, two official plugins are available:
+## Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Frontend**: React 19 + TypeScript + Vite
+- **Styling**: Tailwind CSS v4
+- **AI**: Google Gemini (gemini-2.5-flash with gemini-3.5-flash primary + failover)
+- **Storage**: Firebase + localStorage (Phase 5 migration-ready)
+- **Routing**: React Router DOM v7
 
-## React Compiler
+## Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Phase | Feature |
+|---|---|
+| 1 | Goal Analysis Agent — evaluates difficulty, feasibility, execution mode |
+| 2 | Roadmap Agent — blueprint-based deterministic week allocation |
+| 3 | Daily Mission Agent — converts roadmap weeks into daily execution plans |
+| 4 | Progress & XP System — task completion, streaks, achievements |
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Create a `.env` file at the project root:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```env
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_STORAGE_BUCKET=...
+VITE_FIREBASE_MESSAGING_SENDER_ID=...
+VITE_FIREBASE_APP_ID=...
+VITE_GEMINI_API_KEY=...
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Architecture
 
 ```
+src/
+├── ai/               AI agents (Goal Analysis, Roadmap, Daily Mission)
+├── data/blueprints/  Deterministic learning blueprints (DSA, Java, SQL, Spring Boot)
+├── repositories/     Storage abstraction layer (localStorage → Firestore swap-ready)
+├── services/         Business logic (progress, XP, streak, achievements)
+├── hooks/            React hooks bridging services to UI
+├── pages/            LandingPage, GoalPage, AnalysisPage, RoadmapPage, DailyMissionPage
+├── types/            TypeScript domain types
+└── prompts/          Gemini prompt architecture (see docs/architecture/PROMPT_ENGINEERING.md)
+```
+
+## Docs
+
+- [Prompt Engineering Standard](docs/architecture/PROMPT_ENGINEERING.md)
