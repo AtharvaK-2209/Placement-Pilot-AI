@@ -2,30 +2,51 @@
  * @file repositories/index.ts
  *
  * ─── THE SINGLE SWAP POINT ────────────────────────────────────────────────────
- * This is the ONLY file that decides which storage backend is active.
+ * This file decides which storage backend is active based on auth state.
  *
- * To migrate from localStorage to Firestore, change ONE line:
+ * Authenticated user  → FirestoreProgressRepository (cloud, synced)
+ * Unauthenticated     → LocalStorageProgressRepository (local, offline)
  *
- *   CURRENT (Phase 5):
- *     export const progressRepository = new LocalStorageProgressRepository();
- *
- *   FUTURE (Phase 6):
- *     export const progressRepository = new FirestoreProgressRepository();
- *
- * All services, agents, and components import `progressRepository` from here.
+ * All services import `getProgressRepository()` from here.
  * They never instantiate a repository directly.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-export type { ProgressRepository } from './ProgressRepository';
-export { LocalStorageProgressRepository } from './LocalStorageProgressRepository';
-export { FirestoreProgressRepository }    from './FirestoreProgressRepository';
+export type { ProgressRepository }          from './ProgressRepository';
+export type { RoadmapRepository }           from './RoadmapRepository';
+export { LocalStorageProgressRepository }   from './LocalStorageProgressRepository';
+export { FirestoreProgressRepository }      from './FirestoreProgressRepository';
+export { LocalStorageRoadmapRepository }    from './LocalStorageRoadmapRepository';
+export { FirestoreRoadmapRepository }       from './FirestoreRoadmapRepository';
 
-import { LocalStorageProgressRepository } from './LocalStorageProgressRepository';
+import { LocalStorageProgressRepository }  from './LocalStorageProgressRepository';
+import { FirestoreProgressRepository }     from './FirestoreProgressRepository';
+import type { ProgressRepository }         from './ProgressRepository';
+import { db }                              from '../config/firebase';
+import { getCurrentUser }                  from '../services/authService';
 
 /**
- * The active repository instance used by all services.
+ * Returns the correct repository for the current auth state.
  *
- * ↓ Change this one line to switch storage backends.
+ * - Signed in  → FirestoreProgressRepository (data lives in Firestore under the user's uid)
+ * - Signed out → LocalStorageProgressRepository (data lives in localStorage)
+ *
+ * Services call this once per operation so the correct backend is always used
+ * even if auth state changes during the session.
  */
-export const progressRepository = new LocalStorageProgressRepository();
+export function getProgressRepository(): ProgressRepository {
+  const user = getCurrentUser();
+  if (user) {
+    return new FirestoreProgressRepository(db, user.uid);
+  }
+  return new LocalStorageProgressRepository();
+}
+
+/**
+ * Static fallback used by the service singletons in services/index.ts.
+ * Resolves to localStorage initially; services that need auth-aware
+ * behaviour should call getProgressRepository() per operation instead.
+ *
+ * @deprecated  Prefer getProgressRepository() for auth-aware contexts.
+ */
+export const progressRepository: ProgressRepository = new LocalStorageProgressRepository();

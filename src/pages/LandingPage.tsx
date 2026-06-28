@@ -5,8 +5,12 @@ import {
   Route,
   CalendarCheck,
   TrendingUp,
+  LogIn,
+  LogOut,
   type LucideIcon,
 } from 'lucide-react';
+import { useAuth }  from '../contexts/AuthContext';
+import { signOut }  from '../services/authService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -119,6 +123,7 @@ function FeatureCard({
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   return (
     <div className="min-h-screen bg-bg-primary font-sans text-text-primary">
 
@@ -141,6 +146,23 @@ export default function LandingPage() {
             >
               About
             </a>
+            {user ? (
+              <button
+                onClick={async () => { await signOut(); }}
+                className="flex items-center gap-1.5 text-text-secondary transition-colors duration-200 hover:text-danger"
+              >
+                <LogOut size={14} />
+                Sign Out
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate('/login')}
+                className="flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-accent transition-all duration-200 hover:bg-accent/20"
+              >
+                <LogIn size={13} />
+                Sign In
+              </button>
+            )}
           </nav>
         </div>
       </header>

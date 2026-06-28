@@ -16,13 +16,21 @@ import {
   Map,
   Zap,
   Star,
+  RefreshCw,
+  CheckCircle2,
 } from 'lucide-react';
 import type { RoadmapResponse, RoadmapWeek } from '../ai/schemas/roadmap.schema';
 import type { GoalInput } from '../types/goal';
-import { progressService } from '../services/index';
-import { xpService }       from '../services/index';
-import { streakService }   from '../services/index';
-import { achievementService } from '../services/index';
+import { ProgressService }    from '../services/progressService';
+import { XPService }          from '../services/xpService';
+import { StreakService }      from '../services/streakService';
+import { AchievementService } from '../services/achievementService';
+import { RoadmapService }     from '../services/roadmapService';
+import { useRepository }      from '../hooks/useRepository';
+import { useRoadmapRepository } from '../hooks/useRoadmapRepository';
+import { useAuth }            from '../contexts/AuthContext';
+import { replanRoadmap }      from '../ai/dynamicReplanning';
+import type { ReplanResult }  from '../ai/dynamicReplanning';
 import type { WeekProgress, StreakState, Achievement } from '../types/progress';
 
 // ─── Router state ─────────────────────────────────────────────────────────────
@@ -287,6 +295,16 @@ export default function RoadmapPage() {
   // ── Success ───────────────────────────────────────────────────────────────
   const r = roadmapResult.data;
 
+  // ── Auth-aware repository + services ──────────────────────────────────────
+  const { user }        = useAuth();
+  const repo            = useRepository();
+  const roadmapRepo     = useRoadmapRepository();
+  const progressSvc     = new ProgressService(repo);
+  const xpSvc           = new XPService(repo);
+  const streakSvc       = new StreakService(repo);
+  const achievementSvc  = new AchievementService(repo);
+  const roadmapSvc      = new RoadmapService(roadmapRepo);
+
   // ── Progress state ────────────────────────────────────────────────────────
   const [weekProgressMap, setWeekProgressMap] = useState<Record<number, WeekProgress>>({});
   const [totalXP,    setTotalXP]    = useState(0);
@@ -294,20 +312,86 @@ export default function RoadmapPage() {
   const [levelInfo,  setLevelInfo]  = useState({ level: 1, currentXP: 0, nextLevelXP: 500, progress: 0 });
   const [achievements, setAchievements] = useState<Achievement[]>([]);
 
+  // ── Replanning state ──────────────────────────────────────────────────────
+  const [replanning,    setReplanning]    = useState(false);
+  const [replanResult,  setReplanResult]  = useState<ReplanResult | null>(null);
+  const [activeRoadmap, setActiveRoadmap] = useState(r); // tracks current (possibly replanned) roadmap
+  const [activeVersion, setActiveVersion] = useState<number>(1); // version number of active roadmap
+
   useEffect(() => {
     async function loadProgress() {
       const map: Record<number, WeekProgress> = {};
-      for (const week of r.weeks) {
-        map[week.week] = await progressService.getWeekProgress(week.week, week.title);
+      for (const week of activeRoadmap.weeks) {
+        map[week.week] = await progressSvc.getWeekProgress(week.week, week.title);
       }
       setWeekProgressMap(map);
-      setTotalXP(await xpService.getTotal());
-      setStreak(await streakService.getStreak());
-      setLevelInfo(await xpService.getLevelInfo());
-      setAchievements(await achievementService.getAll());
+      setTotalXP(await xpSvc.getTotal());
+      setStreak(await streakSvc.getStreak());
+      setLevelInfo(await xpSvc.getLevelInfo());
+      setAchievements(await achievementSvc.getAll());
+
+      // Load active version number; save V1 if this is the first load
+      const versionNum = await roadmapSvc.getActiveVersionNumber();
+      if (versionNum === null) {
+        const saved = await roadmapSvc.saveVersion(r, 'initial', '', '');
+        setActiveVersion(saved.version);
+      } else {
+        setActiveVersion(versionNum);
+      }
     }
     loadProgress();
-  }, [r.weeks]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRoadmap.weeks, repo, roadmapRepo]);
+
+  // ── Replan handler ────────────────────────────────────────────────────────
+  async function handleReplan() {
+    setReplanning(true);
+    setReplanResult(null);
+
+    const deadlineMs   = new Date(goalInput?.deadline ?? '').getTime() - Date.now();
+    const remainingDays = Math.max(0, Math.ceil(deadlineMs / (1000 * 60 * 60 * 24)));
+    const completedWeeksCount = activeRoadmap.weeks.filter(
+      (w) => (weekProgressMap[w.week]?.completionPercent ?? 0) === 100,
+    ).length;
+    const overallPct = activeRoadmap.totalWeeks > 0
+      ? Math.round((completedWeeksCount / activeRoadmap.totalWeeks) * 100)
+      : 0;
+
+    const result = await replanRoadmap(
+      {
+        goalText:             goalInput?.goal ?? activeRoadmap.title,
+        goalType:             goalInput?.goalType ?? 'placement',
+        deadline:             goalInput?.deadline ?? '',
+        weeklyHours:          goalInput?.weeklyHours ?? Math.round(activeRoadmap.totalHours / activeRoadmap.totalWeeks),
+        executionMode:        activeRoadmap.executionMode,
+        skillGaps:            [],
+        strengths:            [],
+        currentRoadmap:       activeRoadmap,
+        completedWeeks:       completedWeeksCount,
+        totalWeeks:           activeRoadmap.totalWeeks,
+        overallCompletionPct: overallPct,
+        totalXP,
+        currentStreak:        streak.currentStreak,
+        remainingDays,
+        triggerReason:        'manual',
+      },
+      user?.uid,
+    );
+
+    if (result.success) {
+      // Save new immutable version before swapping the active roadmap
+      const saved = await roadmapSvc.saveVersion(
+        result.data.updatedRoadmap,
+        'manual',
+        result.data.reason,
+        result.data.changes.map((c) => c.description).join('; '),
+      );
+      setActiveVersion(saved.version);
+      setActiveRoadmap(result.data.updatedRoadmap);
+      setReplanResult(result.data);
+    }
+    setReplanning(false);
+  }
 
   return (
     <div className="min-h-screen bg-bg-primary font-sans text-text-primary">
@@ -332,14 +416,19 @@ export default function RoadmapPage() {
 
         {/* ── Hero ── */}
         <div className="mb-10 animate-fade-up">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-accent">
-            Execution Roadmap
-          </p>
+          <div className="mb-2 flex items-center gap-3">
+            <p className="text-xs font-semibold uppercase tracking-widest text-accent">
+              Execution Roadmap
+            </p>
+            <span className="rounded-full border border-accent/25 bg-accent/10 px-2.5 py-0.5 text-xs font-semibold text-accent">
+              V{activeVersion}
+            </span>
+          </div>
           <h1 className="text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">
-            {r.title}
+            {activeRoadmap.title}
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-relaxed text-text-secondary">
-            {r.summary}
+            {activeRoadmap.summary}
           </p>
         </div>
 
@@ -355,7 +444,7 @@ export default function RoadmapPage() {
             <p className="text-xs font-medium uppercase tracking-widest text-text-secondary/60">
               Total Weeks
             </p>
-            <p className="text-2xl font-bold text-text-primary">{r.totalWeeks}</p>
+            <p className="text-2xl font-bold text-text-primary">{activeRoadmap.totalWeeks}</p>
           </Card>
 
           <Card className="flex flex-col gap-1 p-5">
@@ -365,7 +454,7 @@ export default function RoadmapPage() {
             <p className="text-xs font-medium uppercase tracking-widest text-text-secondary/60">
               Total Hours
             </p>
-            <p className="text-2xl font-bold text-text-primary">{r.totalHours}</p>
+            <p className="text-2xl font-bold text-text-primary">{activeRoadmap.totalHours}</p>
           </Card>
 
           <Card className="flex flex-col gap-1 p-5">
@@ -375,7 +464,7 @@ export default function RoadmapPage() {
             <p className="text-xs font-medium uppercase tracking-widest text-text-secondary/60">
               Execution Mode
             </p>
-            <p className="text-lg font-bold text-accent">{r.executionMode}</p>
+            <p className="text-lg font-bold text-accent">{activeRoadmap.executionMode}</p>
           </Card>
 
           <Card className="flex flex-col gap-1 p-5">
@@ -386,7 +475,7 @@ export default function RoadmapPage() {
               Weekly Target
             </p>
             <p className="text-lg font-bold text-text-primary">
-              {goalInput ? `${goalInput.weeklyHours} hrs` : `${Math.round(r.totalHours / r.totalWeeks)} hrs`}
+              {goalInput ? `${goalInput.weeklyHours} hrs` : `${Math.round(activeRoadmap.totalHours / activeRoadmap.totalWeeks)} hrs`}
             </p>
           </Card>
         </div>
@@ -464,29 +553,97 @@ export default function RoadmapPage() {
             </h2>
           </div>
 
-          {r.weeks.map((week) => (
+          {activeRoadmap.weeks.map((week) => (
             <WeekCard key={week.week} week={week} weekProgress={weekProgressMap[week.week]} />
           ))}
         </div>
+
+        {/* ── Replan result card ── */}
+        {replanResult && (
+          <div className="mt-8 animate-fade-up rounded-2xl border border-success/20 bg-success/5 p-6">
+            <div className="mb-4 flex items-center gap-2.5">
+              <CheckCircle2 size={16} className="text-success" />
+              <h2 className="text-sm font-bold text-success">Roadmap Updated</h2>
+              <span className={`ml-auto rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                replanResult.riskLevel === 'low'      ? 'border-success/30 bg-success/10 text-success' :
+                replanResult.riskLevel === 'moderate' ? 'border-warning/30 bg-warning/10 text-warning' :
+                'border-danger/30 bg-danger/10 text-danger'
+              }`}>
+                {replanResult.riskLevel.toUpperCase()} RISK
+              </span>
+            </div>
+
+            {/* Reason */}
+            <p className="mb-4 text-sm leading-relaxed text-text-secondary">{replanResult.reason}</p>
+
+            {/* Recommended hours */}
+            <p className="mb-4 text-xs text-text-secondary/60">
+              Recommended pace: <span className="font-semibold text-text-secondary">{replanResult.recommendedWeeklyHours}</span>
+            </p>
+
+            {/* Changes */}
+            {replanResult.changes.length > 0 && (
+              <div className="mb-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-text-secondary/60">Changes Made</p>
+                <ul className="flex flex-col gap-1.5">
+                  {replanResult.changes.map((c, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-text-secondary">
+                      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-accent/60" />
+                      <span className="font-medium text-accent">[Week {c.weekNumber} · {c.type}]</span>
+                      &nbsp;{c.description}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Priority adjustments */}
+            {replanResult.priorityAdjustments.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-text-secondary/60">Priority Adjustments</p>
+                <ul className="flex flex-col gap-1.5">
+                  {replanResult.priorityAdjustments.map((p, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-text-secondary">
+                      <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${
+                        p.direction === 'increased' ? 'bg-success' : p.direction === 'decreased' ? 'bg-warning' : 'bg-danger'
+                      }`} />
+                      <span className="font-medium text-text-primary">{p.topic}</span>
+                      &nbsp;— {p.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Footer ── */}
         <div className="mt-10 flex flex-col items-center gap-4 pb-4 text-center">
           <button
             onClick={() => {
-              // Pass the first learning week so the mission page has context
-              const firstLearningWeek = r.weeks.find((w) => w.type === 'learning') ?? r.weeks[0];
+              const firstLearningWeek = activeRoadmap.weeks.find((w) => w.type === 'learning') ?? activeRoadmap.weeks[0];
               navigate('/daily-mission', {
                 state: {
                   week:          firstLearningWeek,
-                  weeklyHours:   goalInput?.weeklyHours ?? Math.round(r.totalHours / r.totalWeeks),
-                  executionMode: r.executionMode,
-                  roadmapTitle:  r.title,
+                  weeklyHours:   goalInput?.weeklyHours ?? Math.round(activeRoadmap.totalHours / activeRoadmap.totalWeeks),
+                  executionMode: activeRoadmap.executionMode,
+                  roadmapTitle:  activeRoadmap.title,
                 },
               });
             }}
             className="flex items-center gap-2 rounded-xl bg-accent px-10 py-4 text-sm font-semibold text-white shadow-lg shadow-accent/20 transition-all duration-200 hover:bg-accent/90 hover:-translate-y-0.5 active:translate-y-0"
           >
             Generate Today's Mission →
+          </button>
+          <button
+            onClick={handleReplan}
+            disabled={replanning}
+            className="flex items-center gap-2 rounded-xl border border-warning/30 bg-warning/10 px-8 py-3 text-sm font-semibold text-warning transition-all duration-200 hover:bg-warning/20 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 disabled:translate-y-0"
+          >
+            {replanning
+              ? <><span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-warning/30 border-t-warning" />Replanning...</>
+              : <><RefreshCw size={14} />Replan Roadmap</>
+            }
           </button>
           <button
             onClick={() => navigate('/goal')}

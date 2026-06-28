@@ -9,17 +9,16 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { progressService }    from '../services/index';
-import { xpService }          from '../services/index';
-import { streakService }      from '../services/index';
-import { achievementService } from '../services/index';
+import { ProgressService }    from '../services/progressService';
+import { XPService }          from '../services/xpService';
+import { StreakService }      from '../services/streakService';
+import { AchievementService } from '../services/achievementService';
+import { useRepository }      from './useRepository';
 import type { DailyMission }  from '../ai/dailyMission/dailyMission.schema';
 import type { DayProgress, StreakState, Achievement } from '../types/progress';
 
-// ── Re-export for convenience ────────────────────────────────────────────────
-
-// Services are singletons wired to the active repository.
-export { progressService, xpService, streakService, achievementService };
+// ── Re-export service classes (for direct use where repo is available) ────────
+export { ProgressService, XPService, StreakService, AchievementService };
 
 // ─── useProgress ─────────────────────────────────────────────────────────────
 
@@ -48,6 +47,13 @@ export function useDayProgress(
   mission:    DailyMission | null,
   roadmapTitle: string,
 ) {
+  const repo = useRepository();
+
+  // Create service instances bound to the correct repo (localStorage or Firestore)
+  const progressSvc    = new ProgressService(repo);
+  const xpSvc          = new XPService(repo);
+  const streakSvc      = new StreakService(repo);
+  const achievementSvc = new AchievementService(repo);
   const [state, setState] = useState<ProgressState>({
     dayProgress:   null,
     totalXP:       0,
@@ -63,15 +69,15 @@ export function useDayProgress(
     if (!mission) return;
     setState((s) => ({ ...s, loading: true }));
 
-    await progressService.initProgress(roadmapTitle);
-    const dayProgress  = await progressService.openDay(weekNumber, dayNumber, mission);
-    const totalXP      = await xpService.getTotal();
-    const streak       = await streakService.getStreak();
-    const achievements = await achievementService.getAll();
-    const levelInfo    = await xpService.getLevelInfo();
+    await progressSvc.initProgress(roadmapTitle);
+    const dayProgress  = await progressSvc.openDay(weekNumber, dayNumber, mission);
+    const totalXP      = await xpSvc.getTotal();
+    const streak       = await streakSvc.getStreak();
+    const achievements = await achievementSvc.getAll();
+    const levelInfo    = await xpSvc.getLevelInfo();
 
     setState({ dayProgress, totalXP, streak, achievements, levelInfo, newlyUnlocked: [], loading: false });
-  }, [weekNumber, dayNumber, mission, roadmapTitle]);
+  }, [weekNumber, dayNumber, mission, roadmapTitle, repo]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -79,52 +85,41 @@ export function useDayProgress(
 
   const toggleTask = useCallback(async (taskTitle: string, currentlyDone: boolean) => {
     const nowDone = !currentlyDone;
-    const updatedDay = await progressService.completeTask(weekNumber, dayNumber, taskTitle, nowDone);
+    const updatedDay = await progressSvc.completeTask(weekNumber, dayNumber, taskTitle, nowDone);
     if (!updatedDay) return;
 
     const newlyUnlocked: Achievement[] = [];
 
-    // Award XP for completing a task
     if (nowDone) {
-      await xpService.award('task_complete', `Task: ${taskTitle}`);
+      await xpSvc.award('task_complete', `Task: ${taskTitle}`);
     }
 
-    // Check if all tasks are now done → day complete bonus
     const allDone = updatedDay.tasks.every((t: { completed: boolean }) => t.completed);
     if (allDone && nowDone) {
-      await xpService.award('day_complete', `Day ${dayNumber} complete`);
-
-      // Record active day for streak
-      const updatedStreak = await streakService.recordActiveDay();
-
-      // Streak bonus check
-      if (await streakService.shouldAwardStreakBonus()) {
-        await xpService.award('streak_bonus', `${updatedStreak.currentStreak}-day streak!`);
+      await xpSvc.award('day_complete', `Day ${dayNumber} complete`);
+      const updatedStreak = await streakSvc.recordActiveDay();
+      if (await streakSvc.shouldAwardStreakBonus()) {
+        await xpSvc.award('streak_bonus', `${updatedStreak.currentStreak}-day streak!`);
       }
-
-      // First mission achievement
-      const firstMission = await achievementService.unlock('first_mission');
+      const firstMission = await achievementSvc.unlock('first_mission');
       if (firstMission) newlyUnlocked.push(firstMission);
-
-      // Streak achievements
       if (updatedStreak.currentStreak >= 3) {
-        const a = await achievementService.unlock('three_day_streak');
+        const a = await achievementSvc.unlock('three_day_streak');
         if (a) newlyUnlocked.push(a);
       }
       if (updatedStreak.currentStreak >= 7) {
-        const a = await achievementService.unlock('seven_day_streak');
+        const a = await achievementSvc.unlock('seven_day_streak');
         if (a) newlyUnlocked.push(a);
       }
     }
 
-    // XP milestone achievements
-    const totalXP  = await xpService.getTotal();
-    if (totalXP >= 100)  { const a = await achievementService.unlock('hundred_xp');     if (a) newlyUnlocked.push(a); }
-    if (totalXP >= 500)  { const a = await achievementService.unlock('five_hundred_xp'); if (a) newlyUnlocked.push(a); }
+    const totalXP  = await xpSvc.getTotal();
+    if (totalXP >= 100)  { const a = await achievementSvc.unlock('hundred_xp');     if (a) newlyUnlocked.push(a); }
+    if (totalXP >= 500)  { const a = await achievementSvc.unlock('five_hundred_xp'); if (a) newlyUnlocked.push(a); }
 
-    const streak      = await streakService.getStreak();
-    const achievements = await achievementService.getAll();
-    const levelInfo   = await xpService.getLevelInfo();
+    const streak       = await streakSvc.getStreak();
+    const achievements = await achievementSvc.getAll();
+    const levelInfo    = await xpSvc.getLevelInfo();
 
     setState((prev) => ({
       ...prev,
@@ -135,7 +130,7 @@ export function useDayProgress(
       levelInfo,
       newlyUnlocked: [...prev.newlyUnlocked, ...newlyUnlocked],
     }));
-  }, [weekNumber, dayNumber]);
+  }, [weekNumber, dayNumber, repo]);
 
   const clearNewlyUnlocked = useCallback(() => {
     setState((s) => ({ ...s, newlyUnlocked: [] }));
