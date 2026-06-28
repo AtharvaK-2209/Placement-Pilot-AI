@@ -1,0 +1,146 @@
+import type { BlueprintModule } from './types';
+
+/**
+ * Java Blueprint — Core Java to Advanced
+ */
+export const javaBlueprint: BlueprintModule[] = [
+  {
+    id: 'java-basics',
+    title: 'Java Fundamentals',
+    concepts: [
+      'Variables & data types',
+      'Operators & expressions',
+      'Control flow (if/else, switch)',
+      'Loops (for, while, do-while)',
+      'Arrays & strings in Java',
+      'Methods & recursion',
+    ],
+    practice: [
+      'FizzBuzz implementation',
+      'Fibonacci series (iterative & recursive)',
+      'Reverse a string without built-ins',
+      'Find prime numbers in a range',
+    ],
+    estimatedHours: 10,
+    milestone: 'Java Fundamentals Completed',
+  },
+  {
+    id: 'oop',
+    title: 'Object-Oriented Programming',
+    concepts: [
+      'Classes & objects',
+      'Constructors & this keyword',
+      'Inheritance & super',
+      'Method overriding & overloading',
+      'Polymorphism',
+      'Abstraction (abstract classes)',
+      'Interfaces',
+      'Encapsulation',
+    ],
+    practice: [
+      'Model a Bank Account with deposit/withdraw',
+      'Implement Shape hierarchy (Circle, Rectangle)',
+      'Design Animal class with polymorphic speak()',
+    ],
+    estimatedHours: 12,
+    milestone: 'OOP Mastered',
+    prerequisites: ['java-basics'],
+  },
+  {
+    id: 'collections',
+    title: 'Collections Framework',
+    concepts: [
+      'ArrayList vs LinkedList',
+      'HashMap & LinkedHashMap',
+      'HashSet & TreeSet',
+      'Stack & Queue from collections',
+      'Iterator & enhanced for loop',
+      'Generics',
+      'Comparable vs Comparator',
+    ],
+    practice: [
+      'Build a word frequency counter using HashMap',
+      'Sort a list of objects using Comparator',
+      'Implement LRU Cache using LinkedHashMap',
+    ],
+    estimatedHours: 10,
+    milestone: 'Collections Completed',
+    prerequisites: ['oop'],
+  },
+  {
+    id: 'exception-handling',
+    title: 'Exception Handling',
+    concepts: [
+      'Checked vs unchecked exceptions',
+      'try-catch-finally',
+      'Custom exceptions',
+      'throws & throw',
+      'Multi-catch blocks',
+    ],
+    practice: [
+      'Build a safe integer parser with custom exception',
+      'File reading with proper exception chain',
+    ],
+    estimatedHours: 5,
+    milestone: 'Exception Handling Completed',
+    prerequisites: ['collections'],
+  },
+  {
+    id: 'multithreading',
+    title: 'Multithreading',
+    concepts: [
+      'Thread creation (Runnable, Thread class)',
+      'Thread lifecycle',
+      'Synchronization & locks',
+      'wait/notify',
+      'ExecutorService & thread pools',
+      'volatile keyword',
+    ],
+    practice: [
+      'Producer-consumer using wait/notify',
+      'Thread-safe counter with synchronized',
+      'Fixed thread pool task executor',
+    ],
+    estimatedHours: 12,
+    milestone: 'Multithreading Completed',
+    prerequisites: ['exception-handling'],
+  },
+  {
+    id: 'jdbc',
+    title: 'JDBC',
+    concepts: [
+      'JDBC architecture',
+      'Connection, Statement, PreparedStatement',
+      'ResultSet processing',
+      'Transaction management',
+      'Connection pooling basics',
+    ],
+    practice: [
+      'CRUD operations on a Student table',
+      'PreparedStatement-based login query',
+    ],
+    estimatedHours: 8,
+    milestone: 'JDBC Completed',
+    prerequisites: ['multithreading'],
+  },
+  {
+    id: 'advanced-java',
+    title: 'Advanced Java',
+    concepts: [
+      'Lambda expressions',
+      'Stream API (filter, map, reduce, collect)',
+      'Optional',
+      'Functional interfaces',
+      'Method references',
+      'Java 8+ features overview',
+    ],
+    practice: [
+      'Process a list of employees using Streams',
+      'Rewrite collection operations using lambdas',
+      'Chain Stream operations to find top earners',
+    ],
+    estimatedHours: 10,
+    milestone: 'Advanced Java Completed',
+    prerequisites: ['jdbc'],
+  },
+];
