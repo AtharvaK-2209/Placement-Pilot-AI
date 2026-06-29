@@ -22,4 +22,11 @@ export type {
   StreakState,
   Achievement,
   UserProgress,
+  // Phase 10 Gamification types
+  Badge,
+  WeeklyGoal,
+  Milestone,
+  ExtendedStreakState,
+  LevelThreshold,
+  LevelState,
 } from './domain';

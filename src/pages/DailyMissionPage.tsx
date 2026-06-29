@@ -16,6 +16,8 @@ import {
   Trophy, Sparkles, Clock, CheckSquare, Square, Briefcase,
   Flame, Star, Zap,
 } from 'lucide-react';
+import { Button } from '../components/Button';
+import { NoMissionEmptyState } from '../components/EmptyState';
 import type { DailyMission, MissionTask }  from '../ai/dailyMission/dailyMission.schema';
 import type { RoadmapWeek }                from '../ai/schemas/roadmap.schema';
 import { generateDailyMission, formatMinutes } from '../ai/dailyMission/dailyMission';
@@ -258,12 +260,10 @@ export default function DailyMissionPage() {
   // ── Guard ─────────────────────────────────────────────────────────────────
   if (!state) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-bg-primary px-6 font-sans text-text-primary">
-        <AlertTriangle size={40} className="text-warning" />
-        <p className="text-lg font-semibold">No week data found.</p>
-        <button onClick={() => navigate('/goal')} className="rounded-xl bg-accent px-8 py-3 text-sm font-semibold text-white transition-all hover:bg-accent/90">
-          Start Over
-        </button>
+      <div className="flex min-h-screen items-center justify-center bg-bg-primary px-6">
+        <NoMissionEmptyState 
+          onBackToRoadmap={() => navigate('/roadmap')}
+        />
       </div>
     );
   }
@@ -409,15 +409,14 @@ export default function DailyMissionPage() {
                   Loading…
                 </span>
               ) : !mission ? (
-                <button
+                <Button
                   onClick={handleGenerate}
+                  loading={generating}
                   disabled={generating}
-                  className="flex items-center gap-2 rounded-xl bg-accent px-7 py-3 text-sm font-semibold text-white shadow-lg shadow-accent/20 transition-all duration-200 hover:bg-accent/90 hover:-translate-y-0.5 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+                  size="md"
                 >
-                  {generating
-                    ? <><span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />Generating...</>
-                    : <>Generate Day {dayNumber} Mission</>}
-                </button>
+                  {generating ? 'Generating...' : `Generate Day ${dayNumber} Mission`}
+                </Button>
               ) : (
                 <span className="rounded-full border border-success/30 bg-success/10 px-3 py-1.5 text-xs font-semibold text-success">
                   ✓ Mission Ready (Previously Generated)
@@ -433,9 +432,11 @@ export default function DailyMissionPage() {
             <AlertTriangle size={32} className="mx-auto mb-3 text-danger" />
             <h2 className="text-lg font-bold text-text-primary">Failed to generate mission.</h2>
             <p className="mt-2 text-sm text-text-secondary">Gemini could not generate today's mission. Please try again.</p>
-            <button onClick={handleGenerate} className="mt-6 rounded-xl bg-accent px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-accent/20 transition-all hover:bg-accent/90">
-              Try Again
-            </button>
+            <div className="mt-6">
+              <Button onClick={handleGenerate} variant="primary">
+                Try Again
+              </Button>
+            </div>
           </div>
         )}
 
@@ -542,10 +543,12 @@ export default function DailyMissionPage() {
             )}
 
             <div className="flex flex-col items-center gap-3 pb-4 text-center">
-              <button onClick={() => navigate('/roadmap')}
-                className="rounded-xl border border-white/10 bg-bg-card px-8 py-3 text-sm font-semibold text-text-primary transition-all duration-200 hover:border-white/20 hover:bg-bg-secondary hover:-translate-y-0.5">
+              <Button 
+                onClick={() => navigate('/roadmap')}
+                variant="secondary"
+              >
                 ← Back to Roadmap
-              </button>
+              </Button>
             </div>
           </div>
         )}

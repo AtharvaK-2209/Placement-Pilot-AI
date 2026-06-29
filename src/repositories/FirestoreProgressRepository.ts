@@ -207,4 +207,23 @@ export class FirestoreProgressRepository implements ProgressRepository {
     progress.achievements = [...progress.achievements, achievement];
     return this.write(progress);
   }
+
+  // ── Gamification (Phase 10) ─────────────────────────────────────────────────
+
+  async getXPHistory(startDate: string, endDate: string): Promise<XPEntry[]> {
+    const xpLog = await this.getXPLog();
+    return xpLog.filter(entry => {
+      const entryDate = entry.earnedAt.split('T')[0];
+      return entryDate >= startDate && entryDate <= endDate;
+    });
+  }
+
+  async getTotalTasksCompleted(): Promise<number> {
+    const progress = await this.read();
+    if (!progress) return 0;
+    return Object.values(progress.days).reduce(
+      (sum, day) => sum + day.tasks.filter(t => t.completed).length,
+      0
+    );
+  }
 }

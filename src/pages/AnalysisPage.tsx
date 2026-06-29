@@ -12,9 +12,10 @@ import {
   Sparkles,
   Square,
   Flame,
-  Loader2,
   Map,
 } from 'lucide-react';
+import { Button } from '../components/Button';
+import { NoDataEmptyState } from '../components/EmptyState';
 import type {
   GoalAnalysisResponse,
   Difficulty,
@@ -143,15 +144,11 @@ export default function AnalysisPage() {
   // ── Guard: direct URL access ───────────────────────────────────────────────
   if (!result) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-bg-primary px-6 font-sans text-text-primary">
-        <AlertTriangle size={40} className="text-warning" />
-        <p className="text-lg font-semibold">No analysis data found.</p>
-        <button
-          onClick={() => navigate('/goal')}
-          className="rounded-xl bg-accent px-8 py-3 text-sm font-semibold text-white transition-all hover:bg-accent/90"
-        >
-          Start Over
-        </button>
+      <div className="flex min-h-screen items-center justify-center bg-bg-primary px-6">
+        <NoDataEmptyState 
+          message="No analysis data found. Please start by setting your goal."
+          onRefresh={() => navigate('/goal')}
+        />
       </div>
     );
   }
@@ -428,22 +425,21 @@ export default function AnalysisPage() {
 
         {/* ── Footer CTA ── */}
         <div className="flex flex-col items-center gap-4 pb-4 text-center">
-          <button
+          <Button
             onClick={handleGenerateRoadmap}
-            disabled={roadmapLoading || !goalInput}
-            className="flex items-center gap-2 rounded-xl bg-accent px-10 py-4 text-sm font-semibold text-white shadow-lg shadow-accent/20 transition-all duration-200 hover:bg-accent/90 hover:-translate-y-0.5 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:translate-y-0"
+            disabled={!goalInput}
+            loading={roadmapLoading}
+            icon={<Map size={16} />}
+            size="lg"
           >
-            {roadmapLoading
-              ? <><Loader2 size={16} className="animate-spin" />Generating Roadmap...</>
-              : <><Map size={16} />Generate My Roadmap</>
-            }
-          </button>
-          <button
+            {roadmapLoading ? 'Generating Roadmap...' : 'Generate My Roadmap'}
+          </Button>
+          <Button
             onClick={() => navigate('/goal')}
-            className="rounded-xl border border-white/10 bg-bg-card px-8 py-3 text-sm font-semibold text-text-primary transition-all duration-200 hover:border-white/20 hover:bg-bg-secondary hover:-translate-y-0.5"
+            variant="secondary"
           >
             ← Analyze a Different Goal
-          </button>
+          </Button>
         </div>
 
       </main>

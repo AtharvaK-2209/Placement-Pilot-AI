@@ -1,24 +1,21 @@
 /**
  * @file services/index.ts
  *
- * Service registry — creates all service instances wired to the active repository.
- *
- * Components and hooks import from here, never instantiating services directly.
- * Changing the repository (src/repositories/index.ts) automatically propagates
- * to all services with no further changes required.
+ * Central export for all service modules.
+ * Provides a single import point for the entire service layer.
  */
 
-import { progressRepository }  from '../repositories/index';
-import { ProgressService }     from './progressService';
-import { XPService }           from './xpService';
-import { StreakService }        from './streakService';
-import { AchievementService }  from './achievementService';
+// Core services
+export { XPService } from './xpService';
+export { ProgressService } from './progressService';
 
-export const progressService    = new ProgressService(progressRepository);
-export const xpService          = new XPService(progressRepository);
-export const streakService      = new StreakService(progressRepository);
-export const achievementService = new AchievementService(progressRepository);
+// Phase 10 Gamification services
+export { LevelService } from './levelService';
+export { BadgeService } from './badgeService';
+export { StreakService } from './streakService';
+export { WeeklyGoalService } from './weeklyGoalService';
+export { MilestoneService } from './milestoneService';
+export { GamificationService } from './gamificationService';
 
-// Re-export types for convenience
-export type { ProgressRepository } from '../repositories/ProgressRepository';
-export { ACHIEVEMENT_CATALOGUE }   from './achievementService';
+// Re-export types
+export type { XPAwardResult, GamificationState } from './gamificationService';

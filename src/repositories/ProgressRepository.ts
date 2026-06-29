@@ -118,4 +118,17 @@ export interface ProgressRepository {
    * Idempotent — adding a duplicate achievement id is a no-op.
    */
   addAchievement(achievement: Achievement): Promise<void>;
+
+  // ── Gamification (Phase 10) ─────────────────────────────────────────────────
+
+  /**
+   * Returns the XP history for a specific date range.
+   * Used for analytics and weekly goal tracking.
+   */
+  getXPHistory(startDate: string, endDate: string): Promise<XPEntry[]>;
+
+  /**
+   * Returns total tasks completed count.
+   */
+  getTotalTasksCompleted(): Promise<number>;
 }

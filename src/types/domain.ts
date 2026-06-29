@@ -363,6 +363,84 @@ export interface Achievement {
 }
 
 // ══════════════════════════════════════════════════════════════════════
+// 9b. GAMIFICATION DOMAIN — PHASE 10
+// ══════════════════════════════════════════════════════════════════════
+
+/**
+ * Badge definition and unlock state.
+ * Locked badges are shown grayed out in the UI.
+ */
+export interface Badge {
+  id:          string;
+  title:       string;
+  description: string;
+  icon:        string;      // emoji or asset key
+  locked:      boolean;
+  unlockedAt?: ISODateTime;
+  category:    'milestone' | 'streak' | 'completion' | 'special';
+}
+
+/**
+ * Weekly goal state — auto-generated at the start of each week.
+ * Tracks mission completion and XP targets.
+ */
+export interface WeeklyGoal {
+  weekStartDate:    ISODate;   // Monday of the week
+  weekEndDate:      ISODate;   // Sunday of the week
+  targetMissions:   number;    // e.g., 5 missions
+  completedMissions: number;
+  targetXP:         number;    // e.g., 500 XP
+  earnedXP:         number;
+  completed:        boolean;
+  completedAt?:     ISODateTime;
+}
+
+/**
+ * Milestone tracker — key events in the user's journey.
+ * Unlocks badges and drives gamification progression.
+ */
+export interface Milestone {
+  id:          string;
+  title:       string;
+  description: string;
+  icon:        string;
+  unlocked:    boolean;
+  unlockedAt?: ISODateTime;
+}
+
+/**
+ * Extended streak state with weekly/monthly tracking.
+ * Extends the base StreakState with additional metrics.
+ */
+export interface ExtendedStreakState extends StreakState {
+  weeklyStreak:   number;  // consecutive weeks with 5+ active days
+  monthlyStreak:  number;  // consecutive months with 20+ active days
+  missedDays:     number;  // total days missed since start
+}
+
+/**
+ * Level configuration — defines XP thresholds for each level.
+ * Configurable via gamificationConfig.ts.
+ */
+export interface LevelThreshold {
+  level:   number;
+  xpRequired: number;
+  title?:  string;  // e.g., "Beginner", "Intermediate", "Expert"
+}
+
+/**
+ * Current level state with progress to next level.
+ * Derived from totalXP using level thresholds.
+ */
+export interface LevelState {
+  level:        number;
+  currentXP:    number;  // XP within current level
+  nextLevelXP:  number;  // XP needed to reach next level
+  progress:     number;  // 0-100%
+  title?:       string;  // level title if configured
+}
+
+// ══════════════════════════════════════════════════════════════════════
 // 10. USER & SETTINGS DOMAIN
 // ══════════════════════════════════════════════════════════════════════
 
@@ -408,6 +486,11 @@ export interface UserProgress {
   streak:       StreakState;
   achievements: Achievement[];
   updatedAt:    ISODateTime;
+  // Phase 10 gamification fields:
+  badges?:      Badge[];
+  weeklyGoals?: WeeklyGoal[];
+  milestones?:  Milestone[];
+  extendedStreak?: ExtendedStreakState;
 }
 
 // ══════════════════════════════════════════════════════════════════════

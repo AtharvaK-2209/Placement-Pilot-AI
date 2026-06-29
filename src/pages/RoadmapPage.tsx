@@ -19,7 +19,9 @@ import {
   RefreshCw,
   CheckCircle2,
   Lock,
+  Sparkles,
 } from 'lucide-react';
+import { NoRoadmapEmptyState } from '../components/EmptyState';
 import type { RoadmapResponse, RoadmapWeek } from '../ai/schemas/roadmap.schema';
 import type { GoalInput } from '../types/goal';
 import { ProgressService }         from '../services/progressService';
@@ -314,15 +316,10 @@ export default function RoadmapPage() {
   // ── Guard ─────────────────────────────────────────────────────────────────
   if (!roadmapResult) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-bg-primary px-6 font-sans text-text-primary">
-        <AlertTriangle size={40} className="text-warning" />
-        <p className="text-lg font-semibold">No roadmap data found.</p>
-        <button
-          onClick={() => navigate('/goal')}
-          className="rounded-xl bg-accent px-8 py-3 text-sm font-semibold text-white transition-all hover:bg-accent/90"
-        >
-          Start Over
-        </button>
+      <div className="flex min-h-screen items-center justify-center bg-bg-primary px-6">
+        <NoRoadmapEmptyState 
+          onBackToGoal={() => navigate('/goal')}
+        />
       </div>
     );
   }
@@ -723,6 +720,29 @@ export default function RoadmapPage() {
             />
           </div>
         )}
+
+        {/* ── Future You Card ── */}
+        <div className="mb-8 animate-fade-up" style={{ animationDelay: '117ms' }}>
+          <Card>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Sparkles size={15} className="text-accent" />
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-text-secondary">
+                  Future You
+                </h2>
+              </div>
+              <button
+                onClick={() => navigate('/future-you')}
+                className="rounded-lg border border-white/10 bg-bg-secondary px-3 py-2 text-xs font-medium text-text-secondary transition-all hover:border-accent/40 hover:text-text-primary"
+              >
+                View Prediction →
+              </button>
+            </div>
+            <p className="mt-3 text-sm text-text-secondary">
+              See where you'll be if you continue at your current pace. AI-powered career prediction based on your execution patterns.
+            </p>
+          </Card>
+        </div>
 
         {/* ── Week cards ── */}
         <div

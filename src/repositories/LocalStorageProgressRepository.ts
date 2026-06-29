@@ -223,4 +223,26 @@ export class LocalStorageProgressRepository implements ProgressRepository {
     this.write(progress);
     return Promise.resolve();
   }
+
+  // ── Gamification (Phase 10) ─────────────────────────────────────────────────
+
+  async getXPHistory(startDate: string, endDate: string): Promise<XPEntry[]> {
+    const xpLog = await this.getXPLog();
+    return Promise.resolve(
+      xpLog.filter(entry => {
+        const entryDate = entry.earnedAt.split('T')[0];
+        return entryDate >= startDate && entryDate <= endDate;
+      })
+    );
+  }
+
+  async getTotalTasksCompleted(): Promise<number> {
+    const progress = this.read();
+    if (!progress) return Promise.resolve(0);
+    const total = Object.values(progress.days).reduce(
+      (sum, day) => sum + day.tasks.filter(t => t.completed).length,
+      0
+    );
+    return Promise.resolve(total);
+  }
 }

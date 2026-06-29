@@ -32,7 +32,7 @@ export default function LoginPage() {
   async function afterAuth(uid: string) {
     // Run one-time migration from localStorage → Firestore
     await migrateLocalStorageToFirestore(uid);
-    navigate('/');
+    navigate('/dashboard');
   }
 
   async function handleGoogle() {

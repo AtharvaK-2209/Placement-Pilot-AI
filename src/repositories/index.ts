@@ -15,19 +15,25 @@
 export type { ProgressRepository }                     from './ProgressRepository';
 export type { RoadmapRepository }                      from './RoadmapRepository';
 export type { ExecutionIntelligenceRepository }        from './ExecutionIntelligenceRepository';
+export type { FutureYouRepository }                    from './FutureYouRepository';
 export { LocalStorageProgressRepository }              from './LocalStorageProgressRepository';
 export { FirestoreProgressRepository }                 from './FirestoreProgressRepository';
 export { LocalStorageRoadmapRepository }               from './LocalStorageRoadmapRepository';
 export { FirestoreRoadmapRepository }                  from './FirestoreRoadmapRepository';
 export { LocalStorageExecutionIntelligenceRepository } from './LocalStorageExecutionIntelligenceRepository';
 export { FirestoreExecutionIntelligenceRepository }    from './FirestoreExecutionIntelligenceRepository';
+export { LocalStorageFutureYouRepository }             from './LocalStorageFutureYouRepository';
+export { FirestoreFutureYouRepository }                from './FirestoreFutureYouRepository';
 
 import { LocalStorageProgressRepository }              from './LocalStorageProgressRepository';
 import { FirestoreProgressRepository }                 from './FirestoreProgressRepository';
 import { LocalStorageExecutionIntelligenceRepository } from './LocalStorageExecutionIntelligenceRepository';
 import { FirestoreExecutionIntelligenceRepository }    from './FirestoreExecutionIntelligenceRepository';
+import { LocalStorageFutureYouRepository }             from './LocalStorageFutureYouRepository';
+import { FirestoreFutureYouRepository }                from './FirestoreFutureYouRepository';
 import type { ProgressRepository }                     from './ProgressRepository';
 import type { ExecutionIntelligenceRepository }        from './ExecutionIntelligenceRepository';
+import type { FutureYouRepository }                    from './FutureYouRepository';
 import { db }                                          from '../config/firebase';
 import { getCurrentUser }                              from '../services/authService';
 
@@ -69,4 +75,18 @@ export function getExecutionIntelligenceRepository(): ExecutionIntelligenceRepos
     return new FirestoreExecutionIntelligenceRepository(db, user.uid);
   }
   return new LocalStorageExecutionIntelligenceRepository();
+}
+
+/**
+ * Returns the correct Future You repository for the current auth state.
+ *
+ * - Signed in  → FirestoreFutureYouRepository (data lives in Firestore under the user's uid)
+ * - Signed out → LocalStorageFutureYouRepository (data lives in localStorage)
+ */
+export function getFutureYouRepository(): FutureYouRepository {
+  const user = getCurrentUser();
+  if (user) {
+    return new FirestoreFutureYouRepository(db, user.uid);
+  }
+  return new LocalStorageFutureYouRepository();
 }
