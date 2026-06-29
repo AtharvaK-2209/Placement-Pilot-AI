@@ -28,6 +28,7 @@ import type {
   ReplanResponse,
 } from './schemas/dynamicReplanning.schema';
 import type { Roadmap }              from '../types/domain';
+import { aiRequestManager }          from './core/aiRequestManager';
 
 // Firestore — only imported for persistence; never used by AI logic
 import { db }                        from '../config/firebase';
@@ -147,6 +148,9 @@ async function persistReplanHistory(
 /**
  * Dynamic Replanning Agent — produces an updated roadmap from current context.
  *
+ * Now uses aiRequestManager for automatic caching, deduplication, and retry logic.
+ * Manual trigger only — cached results are used unless explicitly triggered.
+ *
  * @param input  ReplanInput assembled from router state + repository reads.
  * @param uid    Firebase Auth user id. If provided, result is persisted to Firestore.
  *
@@ -157,84 +161,111 @@ async function persistReplanHistory(
 export async function replanRoadmap(
   input: ReplanInput,
   uid?:  string,
+  forceRefresh: boolean = true, // Always refresh by default for replanning
 ): Promise<ReplanResponse> {
 
-  // ── Step 1: Build prompt ───────────────────────────────────────────────────
-  console.group('[dynamicReplanning] Step 1 — Building Prompt...');
-  let userPrompt: string;
-  try {
-    userPrompt = buildUserPrompt(input);
-    console.log('✓ Prompt built:', userPrompt.length, 'chars, ~', Math.ceil(userPrompt.length / 4), 'tokens');
-  } catch (e) {
-    console.error('✗ Prompt build failed:', e);
-    console.groupEnd();
+  // Use AI Request Manager with caching
+  const result = await aiRequestManager.request<ReplanResponse>({
+    agentName: 'DynamicReplanning',
+    cacheKey: {
+      roadmapVersion: 1, // Could use actual roadmap version
+      completedWeeks: input.completedWeeks,
+      totalWeeks: input.totalWeeks,
+      triggerReason: input.triggerReason ?? 'manual',
+    },
+    generateFn: async () => {
+      // ── Step 1: Build prompt ───────────────────────────────────────────────────
+      console.group('[dynamicReplanning] Step 1 — Building Prompt...');
+      let userPrompt: string;
+      try {
+        userPrompt = buildUserPrompt(input);
+        console.log('✓ Prompt built:', userPrompt.length, 'chars, ~', Math.ceil(userPrompt.length / 4), 'tokens');
+      } catch (e) {
+        console.error('✗ Prompt build failed:', e);
+        console.groupEnd();
+        return { success: false, data: null as unknown as ReplanResult };
+      }
+      console.groupEnd();
+
+      // ── Step 2: Call Gemini ────────────────────────────────────────────────────
+      console.group('[dynamicReplanning] Step 2 — Calling Gemini...');
+      let rawText: string;
+      try {
+        const response = await safeGenerateContent({
+          config: {
+            systemInstruction: DYNAMIC_REPLANNING_SYSTEM_PROMPT,
+            ...GENERATION_CONFIG,
+            maxOutputTokens: 8192,
+          },
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        });
+        rawText = response.text ?? '';
+        console.log('✓ Gemini responded:', rawText.length, 'chars');
+      } catch (e) {
+        console.error('✗ Gemini request failed:', e);
+        console.groupEnd();
+        return { success: false, data: null as unknown as ReplanResult };
+      }
+      console.groupEnd();
+
+      // ── Step 3: Parse JSON ────────────────────────────────────────────────────
+      console.group('[dynamicReplanning] Step 3 — Parsing JSON...');
+      const cleaned = rawText
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/, '')
+        .trim();
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(cleaned);
+        console.log('✓ JSON.parse succeeded');
+      } catch (parseError) {
+        console.error('✗ JSON.parse failed:', parseError);
+        console.error('  raw (first 800):', rawText.slice(0, 800));
+        console.groupEnd();
+        return { success: false, data: null as unknown as ReplanResult };
+      }
+      console.groupEnd();
+
+      // ── Step 4: Validate schema ───────────────────────────────────────────────
+      console.group('[dynamicReplanning] Step 4 — Validating Schema...');
+      const issues = validateReplanResult(parsed);
+      if (issues.length > 0) {
+        console.warn(`⚠ ${issues.length} schema issue(s) — proceeding anyway:`);
+        issues.forEach((i, n) => console.warn(`  [${n + 1}] ${i}`));
+      } else {
+        console.log('✓ Schema validation passed');
+      }
+      console.groupEnd();
+
+      const replanResult = parsed as ReplanResult;
+
+      // Ensure generatedAt is set on the updated roadmap
+      (replanResult.updatedRoadmap as Roadmap).generatedAt = new Date().toISOString();
+
+      console.log('[dynamicReplanning] ✓ Replanning complete');
+      return { success: true, data: replanResult };
+    },
+    cacheTTL: 24 * 60 * 60 * 1000, // 1 day (replanning results are time-sensitive)
+    userId: uid,
+    validator: (response) => {
+      return response.success && response.data !== null;
+    },
+    forceRefresh,
+  });
+
+  if (!result.success || !result.data) {
     return { success: false, data: null as unknown as ReplanResult };
   }
-  console.groupEnd();
 
-  // ── Step 2: Call Gemini ────────────────────────────────────────────────────
-  console.group('[dynamicReplanning] Step 2 — Calling Gemini...');
-  let rawText: string;
-  try {
-    const response = await safeGenerateContent({
-      config: {
-        systemInstruction: DYNAMIC_REPLANNING_SYSTEM_PROMPT,
-        ...GENERATION_CONFIG,
-        maxOutputTokens: 8192,
-      },
-      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-    });
-    rawText = response.text ?? '';
-    console.log('✓ Gemini responded:', rawText.length, 'chars');
-  } catch (e) {
-    console.error('✗ Gemini request failed:', e);
-    console.groupEnd();
-    return { success: false, data: null as unknown as ReplanResult };
-  }
-  console.groupEnd();
+  const replanResult = result.data;
 
-  // ── Step 3: Parse JSON ────────────────────────────────────────────────────
-  console.group('[dynamicReplanning] Step 3 — Parsing JSON...');
-  const cleaned = rawText
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```$/, '')
-    .trim();
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(cleaned);
-    console.log('✓ JSON.parse succeeded');
-  } catch (parseError) {
-    console.error('✗ JSON.parse failed:', parseError);
-    console.error('  raw (first 800):', rawText.slice(0, 800));
-    console.groupEnd();
-    return { success: false, data: null as unknown as ReplanResult };
-  }
-  console.groupEnd();
-
-  // ── Step 4: Validate schema ───────────────────────────────────────────────
-  console.group('[dynamicReplanning] Step 4 — Validating Schema...');
-  const issues = validateReplanResult(parsed);
-  if (issues.length > 0) {
-    console.warn(`⚠ ${issues.length} schema issue(s) — proceeding anyway:`);
-    issues.forEach((i, n) => console.warn(`  [${n + 1}] ${i}`));
-  } else {
-    console.log('✓ Schema validation passed');
-  }
-  console.groupEnd();
-
-  const result = parsed as ReplanResult;
-
-  // Ensure generatedAt is set on the updated roadmap
-  (result.updatedRoadmap as Roadmap).generatedAt = new Date().toISOString();
-
-  // ── Step 5: Persist to Firestore ──────────────────────────────────────────
-  if (uid) {
-    await persistReplanHistory(uid, input, result);
+  // ── Persist to Firestore ──────────────────────────────────────────────────
+  if (uid && replanResult.data) {
+    await persistReplanHistory(uid, input, replanResult.data);
   }
 
-  console.log('[dynamicReplanning] ✓ Replanning complete');
-  return { success: true, data: result };
+  return result.data;
 }
 
 // ─── Type re-exports (convenience) ───────────────────────────────────────────

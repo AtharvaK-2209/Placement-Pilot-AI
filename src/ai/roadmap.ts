@@ -27,6 +27,7 @@ import { ROADMAP_SYSTEM_PROMPT }   from '../prompts/roadmapPrompt';
 import type { Roadmap, RoadmapResponse } from './schemas/roadmap.schema';
 import type { GoalInput }          from '../types/goal';
 import type { GoalAnalysis }       from './schemas/goalAnalysis.schema';
+import { aiRequestManager }        from './core/aiRequestManager';
 
 // ─── Planner layer ────────────────────────────────────────────────────────────
 import { buildCoveragePlan }       from './roadmap/planner/coveragePlanner';
@@ -99,6 +100,8 @@ function validateRoadmap(obj: unknown): string[] {
  * Step 4: Gemini expands concepts/practice per week (AI only).
  * Step 5: Parse + validate JSON response.
  *
+ * Now uses aiRequestManager for automatic caching, deduplication, and retry logic.
+ *
  * Returns:
  *   { success: true,  data: Roadmap }  — on success
  *   { success: false, data: null }     — on any failure (never throws)
@@ -106,138 +109,161 @@ function validateRoadmap(obj: unknown): string[] {
 export async function generateRoadmap(
   goal:     GoalInput,
   analysis: GoalAnalysis,
+  userId?:  string,
+  goalAnalysisId?: string,
 ): Promise<RoadmapResponse> {
 
-  // ── Step 1: Compute available weeks ───────────────────────────────────────
-  const today      = new Date().toISOString().split('T')[0];
-  const deadlineMs = new Date(goal.deadline).getTime() - new Date(today).getTime();
-  const totalWeeks = Math.max(1, Math.floor(deadlineMs / (1000 * 60 * 60 * 24 * 7)));
+  // Use AI Request Manager with caching
+  const result = await aiRequestManager.request<RoadmapResponse>({
+    agentName: 'Roadmap',
+    cacheKey: {
+      goalAnalysisId: goalAnalysisId ?? 'unknown',
+      roadmapVersion: 1, // Increment when roadmap generation logic changes
+    },
+    generateFn: async () => {
+      // ── Step 1: Compute available weeks ───────────────────────────────────────
+      const today      = new Date().toISOString().split('T')[0];
+      const deadlineMs = new Date(goal.deadline).getTime() - new Date(today).getTime();
+      const totalWeeks = Math.max(1, Math.floor(deadlineMs / (1000 * 60 * 60 * 24 * 7)));
 
-  console.group('[Roadmap] Step 1 — Coverage Planning...');
-  let coveragePlan: ReturnType<typeof buildCoveragePlan>;
-  try {
-    coveragePlan = buildCoveragePlan(
-      goal.goalType,
-      goal.knownSkills,
-      totalWeeks,
-      analysis.executionMode,
-    );
-    console.log('✓ Coverage plan built');
-    console.log('  total weeks     :', totalWeeks);
-    console.log('  learning weeks  :', coveragePlan.learningWeeks);
-    console.log('  revision weeks  :', coveragePlan.revisionWeeks);
-    console.log('  project weeks   :', coveragePlan.projectWeeks);
-    console.log('  interview weeks :', coveragePlan.interviewWeeks);
-    coveragePlan.domains.forEach((d) =>
-      console.log(`  domain: ${d.key.padEnd(12)} priority: ${d.priority}  allocatedWeeks: ${d.allocatedWeeks}`),
-    );
-  } catch (e) {
-    console.error('✗ Coverage planning failed:', e);
-    console.groupEnd();
+      console.group('[Roadmap] Step 1 — Coverage Planning...');
+      let coveragePlan: ReturnType<typeof buildCoveragePlan>;
+      try {
+        coveragePlan = buildCoveragePlan(
+          goal.goalType,
+          goal.knownSkills,
+          totalWeeks,
+          analysis.executionMode,
+        );
+        console.log('✓ Coverage plan built');
+        console.log('  total weeks     :', totalWeeks);
+        console.log('  learning weeks  :', coveragePlan.learningWeeks);
+        console.log('  revision weeks  :', coveragePlan.revisionWeeks);
+        console.log('  project weeks   :', coveragePlan.projectWeeks);
+        console.log('  interview weeks :', coveragePlan.interviewWeeks);
+        coveragePlan.domains.forEach((d) =>
+          console.log(`  domain: ${d.key.padEnd(12)} priority: ${d.priority}  allocatedWeeks: ${d.allocatedWeeks}`),
+        );
+      } catch (e) {
+        console.error('✗ Coverage planning failed:', e);
+        console.groupEnd();
+        return { success: false, data: null as unknown as Roadmap };
+      }
+      console.groupEnd();
+
+      // ── Step 2: Week Allocation ────────────────────────────────────────────────
+      console.group('[Roadmap] Step 2 — Week Allocation...');
+      let allocatedWeeks: ReturnType<typeof allocateWeeks>;
+      try {
+        // Build the set of module IDs the user already knows (to skip in queues)
+        const knownModuleIds = new Set(
+          goal.knownSkills.map((s) => s.toLowerCase().replace(/\s+/g, '-')),
+        );
+
+        allocatedWeeks = allocateWeeks(coveragePlan, totalWeeks, knownModuleIds);
+        summariseAllocation(allocatedWeeks, coveragePlan);
+
+        console.log('✓ Week allocation complete');
+        allocatedWeeks.forEach((w) => {
+          const slotNames = w.slots.map((s) => `${s.domain}:${s.module.title}`).join(', ');
+          console.log(`  Week ${String(w.weekNumber).padStart(2)} [${w.type.padEnd(9)}] ${slotNames || '(special week)'}`);
+        });
+      } catch (e) {
+        console.error('✗ Week allocation failed:', e);
+        console.groupEnd();
+        return { success: false, data: null as unknown as Roadmap };
+      }
+      console.groupEnd();
+
+      // ── Step 3: Build prompt ───────────────────────────────────────────────────
+      console.group('[Roadmap] Step 3 — Building Prompt...');
+      let userPrompt: string;
+      try {
+        userPrompt = buildAllocatedPrompt(goal, analysis, allocatedWeeks, totalWeeks);
+        const userTokens = estimateTokens(userPrompt);
+        const sysTokens  = estimateTokens(ROADMAP_SYSTEM_PROMPT);
+        console.log('✓ Prompt built');
+        console.log('  user prompt   :', userPrompt.length, 'chars,', userTokens, 'est. tokens');
+        console.log('  system prompt :', ROADMAP_SYSTEM_PROMPT.length, 'chars,', sysTokens, 'est. tokens');
+        console.log('  total est.    :', userTokens + sysTokens, 'tokens');
+      } catch (e) {
+        console.error('✗ Prompt build failed:', e);
+        console.groupEnd();
+        return { success: false, data: null as unknown as Roadmap };
+      }
+      console.groupEnd();
+
+      // ── Step 4: Call Gemini ────────────────────────────────────────────────────
+      console.group('[Roadmap] Step 4 — Calling Gemini...');
+      let rawText: string;
+      try {
+        const response = await safeGenerateContent({
+          config: {
+            systemInstruction: ROADMAP_SYSTEM_PROMPT,
+            ...GENERATION_CONFIG,
+            maxOutputTokens: 8192,
+          },
+          contents: [
+            { role: 'user', parts: [{ text: userPrompt }] },
+          ],
+        });
+
+        rawText = response.text ?? '';
+        console.log('✓ Gemini responded');
+        console.log('  response length:', rawText.length, 'chars');
+        console.log('  raw response.text:', rawText);
+      } catch (e) {
+        console.error('✗ Gemini request failed:', e);
+        console.groupEnd();
+        return { success: false, data: null as unknown as Roadmap };
+      }
+      console.groupEnd();
+
+      // ── Step 5: Parse JSON ────────────────────────────────────────────────────
+      console.group('[Roadmap] Step 5 — Parsing JSON...');
+      const cleaned = rawText
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/, '')
+        .trim();
+
+      console.log('  cleaned (first 1000 chars):', cleaned.slice(0, 1000));
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(cleaned);
+        console.log('✓ JSON.parse succeeded');
+      } catch (parseError) {
+        console.error('✗ JSON.parse failed:', parseError);
+        console.error('  raw text (first 1000 chars):', rawText.slice(0, 1000));
+        console.groupEnd();
+        return { success: false, data: null as unknown as Roadmap };
+      }
+      console.groupEnd();
+
+      // ── Step 6: Validate schema ───────────────────────────────────────────────
+      console.group('[Roadmap] Step 6 — Validating Schema...');
+      const issues = validateRoadmap(parsed);
+      if (issues.length > 0) {
+        console.warn(`⚠ ${issues.length} schema issue(s) — proceeding anyway (non-fatal):`);
+        issues.forEach((issue, i) => console.warn(`  [${i + 1}] ${issue}`));
+      } else {
+        console.log('✓ Schema validation passed');
+      }
+      console.groupEnd();
+
+      console.log('[Roadmap] ✓ Roadmap Generated successfully');
+      return { success: true, data: parsed as Roadmap };
+    },
+    cacheTTL: 7 * 24 * 60 * 60 * 1000, // 7 days
+    userId,
+    validator: (response) => {
+      return response.success && response.data !== null;
+    },
+  });
+
+  if (!result.success || !result.data) {
     return { success: false, data: null as unknown as Roadmap };
   }
-  console.groupEnd();
 
-  // ── Step 2: Week Allocation ────────────────────────────────────────────────
-  console.group('[Roadmap] Step 2 — Week Allocation...');
-  let allocatedWeeks: ReturnType<typeof allocateWeeks>;
-  try {
-    // Build the set of module IDs the user already knows (to skip in queues)
-    const knownModuleIds = new Set(
-      goal.knownSkills.map((s) => s.toLowerCase().replace(/\s+/g, '-')),
-    );
-
-    allocatedWeeks = allocateWeeks(coveragePlan, totalWeeks, knownModuleIds);
-    summariseAllocation(allocatedWeeks, coveragePlan);
-
-    console.log('✓ Week allocation complete');
-    allocatedWeeks.forEach((w) => {
-      const slotNames = w.slots.map((s) => `${s.domain}:${s.module.title}`).join(', ');
-      console.log(`  Week ${String(w.weekNumber).padStart(2)} [${w.type.padEnd(9)}] ${slotNames || '(special week)'}`);
-    });
-  } catch (e) {
-    console.error('✗ Week allocation failed:', e);
-    console.groupEnd();
-    return { success: false, data: null as unknown as Roadmap };
-  }
-  console.groupEnd();
-
-  // ── Step 3: Build prompt ───────────────────────────────────────────────────
-  console.group('[Roadmap] Step 3 — Building Prompt...');
-  let userPrompt: string;
-  try {
-    userPrompt = buildAllocatedPrompt(goal, analysis, allocatedWeeks, totalWeeks);
-    const userTokens = estimateTokens(userPrompt);
-    const sysTokens  = estimateTokens(ROADMAP_SYSTEM_PROMPT);
-    console.log('✓ Prompt built');
-    console.log('  user prompt   :', userPrompt.length, 'chars,', userTokens, 'est. tokens');
-    console.log('  system prompt :', ROADMAP_SYSTEM_PROMPT.length, 'chars,', sysTokens, 'est. tokens');
-    console.log('  total est.    :', userTokens + sysTokens, 'tokens');
-  } catch (e) {
-    console.error('✗ Prompt build failed:', e);
-    console.groupEnd();
-    return { success: false, data: null as unknown as Roadmap };
-  }
-  console.groupEnd();
-
-  // ── Step 4: Call Gemini ────────────────────────────────────────────────────
-  console.group('[Roadmap] Step 4 — Calling Gemini...');
-  let rawText: string;
-  try {
-    const response = await safeGenerateContent({
-      config: {
-        systemInstruction: ROADMAP_SYSTEM_PROMPT,
-        ...GENERATION_CONFIG,
-        maxOutputTokens: 8192,
-      },
-      contents: [
-        { role: 'user', parts: [{ text: userPrompt }] },
-      ],
-    });
-
-    rawText = response.text ?? '';
-    console.log('✓ Gemini responded');
-    console.log('  response length:', rawText.length, 'chars');
-    console.log('  raw response.text:', rawText);
-  } catch (e) {
-    console.error('✗ Gemini request failed:', e);
-    console.groupEnd();
-    return { success: false, data: null as unknown as Roadmap };
-  }
-  console.groupEnd();
-
-  // ── Step 5: Parse JSON ────────────────────────────────────────────────────
-  console.group('[Roadmap] Step 5 — Parsing JSON...');
-  const cleaned = rawText
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```$/, '')
-    .trim();
-
-  console.log('  cleaned (first 1000 chars):', cleaned.slice(0, 1000));
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(cleaned);
-    console.log('✓ JSON.parse succeeded');
-  } catch (parseError) {
-    console.error('✗ JSON.parse failed:', parseError);
-    console.error('  raw text (first 1000 chars):', rawText.slice(0, 1000));
-    console.groupEnd();
-    return { success: false, data: null as unknown as Roadmap };
-  }
-  console.groupEnd();
-
-  // ── Step 6: Validate schema ───────────────────────────────────────────────
-  console.group('[Roadmap] Step 6 — Validating Schema...');
-  const issues = validateRoadmap(parsed);
-  if (issues.length > 0) {
-    console.warn(`⚠ ${issues.length} schema issue(s) — proceeding anyway (non-fatal):`);
-    issues.forEach((issue, i) => console.warn(`  [${i + 1}] ${issue}`));
-  } else {
-    console.log('✓ Schema validation passed');
-  }
-  console.groupEnd();
-
-  console.log('[Roadmap] ✓ Roadmap Generated successfully');
-  return { success: true, data: parsed as Roadmap };
+  return result.data;
 }

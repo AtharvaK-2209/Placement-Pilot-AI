@@ -236,7 +236,8 @@ export default function GoalPage() {
           <div className="rounded-2xl border border-white/5 bg-bg-card p-6">
             <p className={labelBase}>Skills you already know</p>
             <p className="mb-4 text-xs text-text-secondary/60">
-              Select all that apply. These will be excluded from your learning roadmap.
+              Select skills you have already mastered. These will be <span className="font-semibold text-warning">skipped</span> in your roadmap so you only study what you need.
+              Leave all unselected if you want the full roadmap.
             </p>
             <div className="flex flex-wrap gap-2">
               {ALL_SKILLS.map((skill) => {

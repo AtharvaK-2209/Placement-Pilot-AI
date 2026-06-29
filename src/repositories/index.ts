@@ -12,18 +12,24 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-export type { ProgressRepository }          from './ProgressRepository';
-export type { RoadmapRepository }           from './RoadmapRepository';
-export { LocalStorageProgressRepository }   from './LocalStorageProgressRepository';
-export { FirestoreProgressRepository }      from './FirestoreProgressRepository';
-export { LocalStorageRoadmapRepository }    from './LocalStorageRoadmapRepository';
-export { FirestoreRoadmapRepository }       from './FirestoreRoadmapRepository';
+export type { ProgressRepository }                     from './ProgressRepository';
+export type { RoadmapRepository }                      from './RoadmapRepository';
+export type { ExecutionIntelligenceRepository }        from './ExecutionIntelligenceRepository';
+export { LocalStorageProgressRepository }              from './LocalStorageProgressRepository';
+export { FirestoreProgressRepository }                 from './FirestoreProgressRepository';
+export { LocalStorageRoadmapRepository }               from './LocalStorageRoadmapRepository';
+export { FirestoreRoadmapRepository }                  from './FirestoreRoadmapRepository';
+export { LocalStorageExecutionIntelligenceRepository } from './LocalStorageExecutionIntelligenceRepository';
+export { FirestoreExecutionIntelligenceRepository }    from './FirestoreExecutionIntelligenceRepository';
 
-import { LocalStorageProgressRepository }  from './LocalStorageProgressRepository';
-import { FirestoreProgressRepository }     from './FirestoreProgressRepository';
-import type { ProgressRepository }         from './ProgressRepository';
-import { db }                              from '../config/firebase';
-import { getCurrentUser }                  from '../services/authService';
+import { LocalStorageProgressRepository }              from './LocalStorageProgressRepository';
+import { FirestoreProgressRepository }                 from './FirestoreProgressRepository';
+import { LocalStorageExecutionIntelligenceRepository } from './LocalStorageExecutionIntelligenceRepository';
+import { FirestoreExecutionIntelligenceRepository }    from './FirestoreExecutionIntelligenceRepository';
+import type { ProgressRepository }                     from './ProgressRepository';
+import type { ExecutionIntelligenceRepository }        from './ExecutionIntelligenceRepository';
+import { db }                                          from '../config/firebase';
+import { getCurrentUser }                              from '../services/authService';
 
 /**
  * Returns the correct repository for the current auth state.
@@ -50,3 +56,17 @@ export function getProgressRepository(): ProgressRepository {
  * @deprecated  Prefer getProgressRepository() for auth-aware contexts.
  */
 export const progressRepository: ProgressRepository = new LocalStorageProgressRepository();
+
+/**
+ * Returns the correct Execution Intelligence repository for the current auth state.
+ *
+ * - Signed in  → FirestoreExecutionIntelligenceRepository (data lives in Firestore under the user's uid)
+ * - Signed out → LocalStorageExecutionIntelligenceRepository (data lives in localStorage)
+ */
+export function getExecutionIntelligenceRepository(): ExecutionIntelligenceRepository {
+  const user = getCurrentUser();
+  if (user) {
+    return new FirestoreExecutionIntelligenceRepository(db, user.uid);
+  }
+  return new LocalStorageExecutionIntelligenceRepository();
+}

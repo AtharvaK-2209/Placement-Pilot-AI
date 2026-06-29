@@ -46,4 +46,39 @@ export const activeRoadmapPointerDoc = (uid: string) => `users/${uid}/roadmaps/c
 
 // export const goalDoc    = (uid: string, goalId: string)    => `users/${uid}/goals/${goalId}`;
 // export const roadmapDoc = (uid: string, roadmapId: string) => `users/${uid}/roadmaps/${roadmapId}`;
-// export const missionDoc = (uid: string, key: string)       => `users/${uid}/missions/${key}`;
+
+// ─── Roadmap Progress ─────────────────────────────────────────────────────────
+
+/** Overall roadmap execution progress — unlocked weeks, completed days, etc. */
+export const roadmapProgressDoc = (uid: string) => `users/${uid}/roadmapProgress/current`;
+
+/**
+ * Collection holding persisted daily missions.
+ * Each document is keyed by "w{week}-d{day}" matching the DayProgress key.
+ */
+export const dailyMissionsCollection = (uid: string) => `users/${uid}/dailyMissions`;
+
+export const dailyMissionDoc = (uid: string, weekNumber: number, dayNumber: number) =>
+  `users/${uid}/dailyMissions/w${weekNumber}-d${dayNumber}`;
+
+// ─── Goal Health ──────────────────────────────────────────────────────────────
+
+/** Latest computed Goal Health Score. Overwritten on every new evaluation. */
+export const goalHealthDoc = (uid: string) => `users/${uid}/goalHealth/latest`;
+
+/** Immutable history entries. Each entry is keyed by its ISO evaluatedAt timestamp. */
+export const goalHealthHistoryCollection = (uid: string) => `users/${uid}/goalHealth/history`;
+
+export const goalHealthHistoryDoc = (uid: string, timestamp: string) =>
+  `users/${uid}/goalHealth/history/${timestamp}`;
+
+// ─── Execution Intelligence ───────────────────────────────────────────────────
+
+/** Latest computed Execution Intelligence analysis. Overwritten on every new evaluation. */
+export const executionIntelligenceDoc = (uid: string) => `users/${uid}/executionIntelligence/latest`;
+
+/** Immutable history entries. Each entry is keyed by its ISO evaluatedAt timestamp. */
+export const executionIntelligenceHistoryCollection = (uid: string) => `users/${uid}/executionIntelligence/history`;
+
+export const executionIntelligenceHistoryDoc = (uid: string, timestamp: string) =>
+  `users/${uid}/executionIntelligence/history/${timestamp}`;

@@ -47,6 +47,7 @@ const SKILL_TO_BLUEPRINT: Partial<Record<Skill, BlueprintKey>> = {
   'Spring Boot': 'springboot',
   'SQL':         'sql',
   'DSA':         'dsa',
+  'DBMS':        'sql',   // DBMS maps to SQL blueprint
 };
 
 // ─── Main function ────────────────────────────────────────────────────────────
@@ -54,8 +55,25 @@ const SKILL_TO_BLUEPRINT: Partial<Record<Skill, BlueprintKey>> = {
 /**
  * Builds a deterministic coverage plan from the user's goal profile.
  *
+ * IMPORTANT — knownSkills semantics:
+ *   In the GoalPage UI, "known skills" are chips the user selects to indicate
+ *   what they already know.
+ *
+ *   MANDATORY domains (defined by the goal profile) are ALWAYS included,
+ *   regardless of knownSkills. This ensures that core requirements for the
+ *   goal (e.g., DSA + Java + SQL for SDE internship) always appear in the
+ *   roadmap title and weekly plan.
+ *
+ *   OPTIONAL domains (e.g., Spring Boot) can be excluded if:
+ *     - They appear in knownSkills (user already knows them), OR
+ *     - Timeline is tight and execution mode is aggressive
+ *
+ *   The knownSkills field affects module content depth and practice volume
+ *   within the modules (handled by Gemini via promptBuilder), but does NOT
+ *   remove mandatory domains from the roadmap structure.
+ *
  * @param goalType      - User's selected goal category
- * @param knownSkills   - Skills the user already has (may skip domains)
+ * @param knownSkills   - Skills the user already HAS (affects optional domains only)
  * @param totalWeeks    - Total available weeks from today to deadline
  * @param executionMode - Influences whether optional domains are kept
  */
@@ -86,15 +104,19 @@ export function buildCoveragePlan(
   const learningWeeks  = Math.max(1, totalWeeks - reservedWeeks);
 
   // Filter domains
+  // FIX: Mandatory domains are ALWAYS included regardless of knownSkills
+  //      Only optional domains can be filtered based on knownSkills
   let domains = profile.domains.filter((d) => {
-    // Skip fully mastered domains
+    // ALWAYS include mandatory domains (they define the goal's core requirements)
+    if (!d.optional) return true;
+    // For optional domains, skip if already mastered
     if (masteredKeys.has(d.key)) return false;
     // Drop optional domains when timeline is tight and mode is aggressive
     if (d.optional && isAggressive && learningWeeks <= 4) return false;
     return true;
   });
 
-  // If we somehow have no domains, fall back to mandatory ones ignoring mastery
+  // Fallback: never produce an empty plan
   if (domains.length === 0) {
     domains = profile.domains.filter((d) => !d.optional);
   }
@@ -106,18 +128,17 @@ export function buildCoveragePlan(
   const totalPriority = domains.reduce((s, d) => s + d.priority, 0);
 
   const coverageDomains: DomainCoverage[] = domains.map((d) => {
-    // Proportional share, floored, but never below minimumWeeks
     const proportional = Math.floor((d.priority / totalPriority) * learningWeeks);
     const allocatedWeeks = Math.max(d.minimumWeeks, proportional);
     return { key: d.key, priority: d.priority, allocatedWeeks };
   });
 
-  // If total allocated > learning weeks, trim optional domains from the back
+  // Trim over-allocation from optional domains at the back
   let totalAllocated = coverageDomains.reduce((s, d) => s + d.allocatedWeeks, 0);
   for (let i = coverageDomains.length - 1; i >= 0 && totalAllocated > learningWeeks; i--) {
     const domain = profile.domains.find((d) => d.key === coverageDomains[i].key);
     if (domain?.optional) {
-      const excess = totalAllocated - learningWeeks;
+      const excess    = totalAllocated - learningWeeks;
       const reducible = coverageDomains[i].allocatedWeeks - (domain.minimumWeeks ?? 1);
       const reduction = Math.min(excess, reducible);
       if (reduction > 0) {
@@ -130,7 +151,7 @@ export function buildCoveragePlan(
     }
   }
 
-  // If relaxed and we have spare weeks, give extra to the top-priority domain
+  // Give spare weeks to the top-priority domain when timeline is relaxed
   if (isRelaxed && totalAllocated < learningWeeks) {
     coverageDomains[0] = {
       ...coverageDomains[0],

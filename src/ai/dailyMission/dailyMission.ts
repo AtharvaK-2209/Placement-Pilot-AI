@@ -30,6 +30,7 @@ import type {
   MissionTask,
 } from './dailyMission.schema';
 import type { RoadmapModule }          from '../schemas/roadmap.schema';
+import { aiRequestManager }            from '../core/aiRequestManager';
 
 // ─── Prompt builder ────────────────────────────────────────────────────────────
 
@@ -115,6 +116,8 @@ function validateMission(obj: unknown): string[] {
  * This is the single public function of the Daily Mission Agent.
  * Call this from any component or future agent that needs today's plan.
  *
+ * Now uses aiRequestManager for automatic caching, deduplication, and retry logic.
+ *
  * @param input — week, dayNumber, executionMode, weeklyHours
  * @returns     — DailyMissionResponse { success, data }
  *
@@ -122,82 +125,106 @@ function validateMission(obj: unknown): string[] {
  */
 export async function generateDailyMission(
   input: DailyMissionInput,
+  userId?: string,
+  roadmapVersion?: number,
 ): Promise<DailyMissionResponse> {
 
-  // ── Step 1: Build prompt ───────────────────────────────────────────────────
-  console.group('[DailyMission] Step 1 — Building Prompt...');
-  let userPrompt: string;
-  try {
-    userPrompt = buildDailyMissionPrompt(input);
-    console.log('✓ Prompt built');
-    console.log('  week         :', input.week.week, '—', input.week.title);
-    console.log('  day          :', input.dayNumber);
-    console.log('  executionMode:', input.executionMode);
-    console.log('  weeklyHours  :', input.weeklyHours);
-    console.log('  prompt length:', userPrompt.length, 'chars');
-  } catch (e) {
-    console.error('✗ Prompt build failed:', e);
-    console.groupEnd();
+  // Use AI Request Manager with caching
+  const result = await aiRequestManager.request<DailyMissionResponse>({
+    agentName: 'DailyMission',
+    cacheKey: {
+      roadmapVersion: roadmapVersion ?? 1,
+      weekNumber: input.week.week,
+      dayNumber: input.dayNumber,
+    },
+    generateFn: async () => {
+      // ── Step 1: Build prompt ───────────────────────────────────────────────────
+      console.group('[DailyMission] Step 1 — Building Prompt...');
+      let userPrompt: string;
+      try {
+        userPrompt = buildDailyMissionPrompt(input);
+        console.log('✓ Prompt built');
+        console.log('  week         :', input.week.week, '—', input.week.title);
+        console.log('  day          :', input.dayNumber);
+        console.log('  executionMode:', input.executionMode);
+        console.log('  weeklyHours  :', input.weeklyHours);
+        console.log('  prompt length:', userPrompt.length, 'chars');
+      } catch (e) {
+        console.error('✗ Prompt build failed:', e);
+        console.groupEnd();
+        return { success: false, data: null as unknown as DailyMission };
+      }
+      console.groupEnd();
+
+      // ── Step 2: Call Gemini ────────────────────────────────────────────────────
+      console.group('[DailyMission] Step 2 — Calling Gemini...');
+      let rawText: string;
+      try {
+        const response = await safeGenerateContent({
+          config: {
+            systemInstruction: DAILY_MISSION_SYSTEM_PROMPT,
+            ...GENERATION_CONFIG,
+            maxOutputTokens: 2048,
+          },
+          contents: [
+            { role: 'user', parts: [{ text: userPrompt }] },
+          ],
+        });
+
+        rawText = response.text ?? '';
+        console.log('✓ Gemini responded —', rawText.length, 'chars');
+      } catch (e) {
+        console.error('✗ Gemini request failed:', e);
+        console.groupEnd();
+        return { success: false, data: null as unknown as DailyMission };
+      }
+      console.groupEnd();
+
+      // ── Step 3: Parse JSON ────────────────────────────────────────────────────
+      console.group('[DailyMission] Step 3 — Parsing JSON...');
+      const cleaned = rawText
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/, '')
+        .trim();
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(cleaned);
+        console.log('✓ JSON.parse succeeded');
+      } catch (parseError) {
+        console.error('✗ JSON.parse failed:', parseError);
+        console.error('  raw text (first 800 chars):', rawText.slice(0, 800));
+        console.groupEnd();
+        return { success: false, data: null as unknown as DailyMission };
+      }
+      console.groupEnd();
+
+      // ── Step 4: Validate ──────────────────────────────────────────────────────
+      console.group('[DailyMission] Step 4 — Validating Schema...');
+      const issues = validateMission(parsed);
+      if (issues.length > 0) {
+        console.warn(`⚠ ${issues.length} schema issue(s) — proceeding anyway:`);
+        issues.forEach((issue, i) => console.warn(`  [${i + 1}] ${issue}`));
+      } else {
+        console.log('✓ Schema validation passed');
+      }
+      console.groupEnd();
+
+      console.log('[DailyMission] ✓ Mission generated successfully');
+      return { success: true, data: parsed as DailyMission };
+    },
+    cacheTTL: 24 * 60 * 60 * 1000, // 1 day (daily missions change daily)
+    userId,
+    validator: (response) => {
+      return response.success && response.data !== null;
+    },
+  });
+
+  if (!result.success || !result.data) {
     return { success: false, data: null as unknown as DailyMission };
   }
-  console.groupEnd();
 
-  // ── Step 2: Call Gemini ────────────────────────────────────────────────────
-  console.group('[DailyMission] Step 2 — Calling Gemini...');
-  let rawText: string;
-  try {
-    const response = await safeGenerateContent({
-      config: {
-        systemInstruction: DAILY_MISSION_SYSTEM_PROMPT,
-        ...GENERATION_CONFIG,
-        maxOutputTokens: 2048,
-      },
-      contents: [
-        { role: 'user', parts: [{ text: userPrompt }] },
-      ],
-    });
-
-    rawText = response.text ?? '';
-    console.log('✓ Gemini responded —', rawText.length, 'chars');
-  } catch (e) {
-    console.error('✗ Gemini request failed:', e);
-    console.groupEnd();
-    return { success: false, data: null as unknown as DailyMission };
-  }
-  console.groupEnd();
-
-  // ── Step 3: Parse JSON ────────────────────────────────────────────────────
-  console.group('[DailyMission] Step 3 — Parsing JSON...');
-  const cleaned = rawText
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```$/, '')
-    .trim();
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(cleaned);
-    console.log('✓ JSON.parse succeeded');
-  } catch (parseError) {
-    console.error('✗ JSON.parse failed:', parseError);
-    console.error('  raw text (first 800 chars):', rawText.slice(0, 800));
-    console.groupEnd();
-    return { success: false, data: null as unknown as DailyMission };
-  }
-  console.groupEnd();
-
-  // ── Step 4: Validate ──────────────────────────────────────────────────────
-  console.group('[DailyMission] Step 4 — Validating Schema...');
-  const issues = validateMission(parsed);
-  if (issues.length > 0) {
-    console.warn(`⚠ ${issues.length} schema issue(s) — proceeding anyway:`);
-    issues.forEach((issue, i) => console.warn(`  [${i + 1}] ${issue}`));
-  } else {
-    console.log('✓ Schema validation passed');
-  }
-  console.groupEnd();
-
-  console.log('[DailyMission] ✓ Mission generated successfully');
-  return { success: true, data: parsed as DailyMission };
+  return result.data;
 }
 
 // ─── Task helpers (exported for UI use) ───────────────────────────────────────

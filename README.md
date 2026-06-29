@@ -18,6 +18,10 @@ AI-powered placement preparation platform with personalized roadmaps, daily miss
 | 2 | Roadmap Agent — blueprint-based deterministic week allocation |
 | 3 | Daily Mission Agent — converts roadmap weeks into daily execution plans |
 | 4 | Progress & XP System — task completion, streaks, achievements |
+| 5 | Firebase Authentication — Google SSO, email/password, anonymous auth |
+| 6 | Cloud Persistence — Firestore integration with migration from localStorage |
+| 7 | Goal Health Agent — evaluates likelihood of roadmap completion |
+| 8 | **Execution Intelligence Agent** — behavioral pattern detection & coaching |
 
 ## Getting Started
 

@@ -1,0 +1,321 @@
+/**
+ * @file ProgressAnalyticsPage.tsx
+ * 
+ * Example implementation of a Progress Analytics page featuring:
+ * - Goal Health Card
+ * - Execution Intelligence Card
+ * - Progress Overview
+ * 
+ * This is an EXAMPLE file. Rename to .tsx and customize as needed.
+ */
+
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { BarChart3, TrendingUp, Brain } from 'lucide-react';
+import GoalHealthCard from '../components/GoalHealthCard';
+import ExecutionIntelligenceCard from '../components/ExecutionIntelligenceCard';
+import { generateGoalHealth } from '../ai/goalHealth/goalHealth';
+import { generateExecutionIntelligence } from '../ai/executionIntelligence/executionIntelligence';
+import type { GoalHealthInput, GoalHealthScore, GoalHealthHistoryEntry } from '../ai/goalHealth/goalHealth.schema';
+import type { ExecutionIntelligenceInput, ExecutionIntelligenceScore } from '../ai/executionIntelligence/executionIntelligence.schema';
+import { getExecutionIntelligenceRepository } from '../repositories';
+import { getCurrentUser } from '../services/authService';
+
+// You'll need to import your actual state management and repositories
+// This is a simplified example showing the pattern
+
+export default function ProgressAnalyticsPage() {
+  const navigate = useNavigate();
+  const user = getCurrentUser();
+
+  // Goal Health State
+  const [goalHealth, setGoalHealth] = useState<GoalHealthScore | null>(null);
+  const [goalHealthHistory, setGoalHealthHistory] = useState<GoalHealthHistoryEntry[]>([]);
+  const [goalHealthLoading, setGoalHealthLoading] = useState(false);
+  const [goalHealthError, setGoalHealthError] = useState<string | null>(null);
+
+  // Execution Intelligence State
+  const [executionIntelligence, setExecutionIntelligence] = useState<ExecutionIntelligenceScore | null>(null);
+  const [executionIntelligenceLoading, setExecutionIntelligenceLoading] = useState(false);
+  const [executionIntelligenceError, setExecutionIntelligenceError] = useState<string | null>(null);
+
+  // Load cached data on mount
+  useEffect(() => {
+    loadCachedData();
+  }, []);
+
+  async function loadCachedData() {
+    try {
+      // Load cached Goal Health
+      // const goalHealthRepo = getGoalHealthRepository();
+      // const cachedGoalHealth = await goalHealthRepo.getHealth();
+      // const cachedGoalHealthHistory = await goalHealthRepo.getHistory();
+      // if (cachedGoalHealth) setGoalHealth(cachedGoalHealth);
+      // if (cachedGoalHealthHistory) setGoalHealthHistory(cachedGoalHealthHistory);
+
+      // Load cached Execution Intelligence
+      const intelligenceRepo = getExecutionIntelligenceRepository();
+      const cachedIntelligence = await intelligenceRepo.getIntelligence();
+      if (cachedIntelligence) setExecutionIntelligence(cachedIntelligence);
+    } catch (e) {
+      console.error('Failed to load cached data:', e);
+    }
+  }
+
+  // Build Goal Health Input from your app state
+  async function buildGoalHealthInput(): Promise<GoalHealthInput> {
+    // TODO: Replace with actual data gathering from your state management
+    // This is a placeholder showing the required structure
+    
+    return {
+      executionMode: 'Balanced',
+      roadmapVersion: 1,
+      totalWeeks: 24,
+      completedWeeks: 8,
+      overallCompletionPct: 35,
+      remainingWeeks: 16,
+      totalXP: 7250,
+      level: 15,
+      currentStreak: 7,
+      longestStreak: 12,
+      achievementCount: 8,
+      consistencyRate: 85,
+      replanCount: 0,
+      streakActiveToday: true,
+    };
+  }
+
+  // Build Execution Intelligence Input from your app state
+  async function buildExecutionIntelligenceInput(): Promise<ExecutionIntelligenceInput> {
+    // TODO: Replace with actual data gathering from your state management
+    // See docs/EXECUTION_INTELLIGENCE_INTEGRATION.md for complete example
+    
+    return {
+      currentGoal: 'Get placed in a product-based company',
+      goalType: 'placement',
+      deadline: '2027-12-31',
+      difficulty: 'Medium',
+      feasibility: 'High',
+      executionMode: 'Balanced',
+      roadmapVersion: 1,
+      totalWeeks: 24,
+      completedWeeks: 8,
+      currentWeek: 9,
+      remainingWeeks: 16,
+      remainingDays: 180,
+      remainingHours: 4320,
+      weeklyHours: 15,
+      overallCompletionPct: 35,
+      completedTasks: 145,
+      totalTasks: 400,
+      completedDays: 56,
+      totalXP: 7250,
+      level: 15,
+      achievementCount: 8,
+      currentStreak: 7,
+      longestStreak: 12,
+      streakActiveToday: true,
+      totalActiveDays: 56,
+      consistencyRate: 85,
+      goalHealthScore: goalHealth?.score ?? 0,
+      goalHealthLevel: goalHealth?.level ?? 'healthy',
+      weeklyCompletionPattern: [80, 85, 75, 90],
+      replanCount: 0,
+      missedTasksCount: 12,
+      revisionTasksCompletedCount: 18,
+      revisionTasksTotalCount: 25,
+      projectTasksCompletedCount: 2,
+      projectTasksTotalCount: 4,
+      practiceTasksCompletedCount: 95,
+      practiceTasksTotalCount: 120,
+      topicsWithHighCompletion: ['DSA', 'SQL', 'Java'],
+      topicsWithLowCompletion: ['Spring Boot', 'Projects'],
+    };
+  }
+
+  // Refresh Goal Health
+  async function refreshGoalHealth() {
+    setGoalHealthLoading(true);
+    setGoalHealthError(null);
+
+    try {
+      const input = await buildGoalHealthInput();
+      const response = await generateGoalHealth(input, user?.uid, true);
+
+      if (response.success) {
+        setGoalHealth(response.data);
+
+        // Persist to repository
+        // const repo = getGoalHealthRepository();
+        // await repo.saveHealth(response.data);
+        // await repo.saveHistory({
+        //   ...response.data,
+        //   evaluatedAt: response.data.computedAt,
+        //   roadmapVersion: input.roadmapVersion,
+        //   streak: input.currentStreak,
+        //   overallCompletionPct: input.overallCompletionPct,
+        // });
+      } else {
+        setGoalHealthError('Failed to generate goal health analysis');
+      }
+    } catch (e) {
+      console.error('Goal health error:', e);
+      setGoalHealthError(e instanceof Error ? e.message : 'An unexpected error occurred');
+    } finally {
+      setGoalHealthLoading(false);
+    }
+  }
+
+  // Refresh Execution Intelligence
+  async function refreshExecutionIntelligence() {
+    setExecutionIntelligenceLoading(true);
+    setExecutionIntelligenceError(null);
+
+    try {
+      const input = await buildExecutionIntelligenceInput();
+      const response = await generateExecutionIntelligence(input, user?.uid, true);
+
+      if (response.success) {
+        setExecutionIntelligence(response.data);
+
+        // Persist to repository
+        const repo = getExecutionIntelligenceRepository();
+        await repo.saveIntelligence(response.data);
+        await repo.saveHistory({
+          overallPerformance: response.data.overallPerformance,
+          strengths: response.data.strengths,
+          weaknesses: response.data.weaknesses,
+          behaviourPatterns: response.data.behaviourPatterns,
+          recommendations: response.data.recommendations,
+          burnoutRisk: response.data.burnoutRisk,
+          deadlineRisk: response.data.deadlineRisk,
+          interviewReadiness: response.data.interviewReadiness,
+          motivationalMessage: response.data.motivationalMessage,
+          confidence: response.data.confidence,
+          evaluatedAt: response.data.computedAt,
+          roadmapVersion: input.roadmapVersion,
+          currentWeek: input.currentWeek,
+          overallCompletion: input.overallCompletionPct,
+        });
+      } else {
+        setExecutionIntelligenceError('Failed to generate execution intelligence analysis');
+      }
+    } catch (e) {
+      console.error('Execution intelligence error:', e);
+      setExecutionIntelligenceError(e instanceof Error ? e.message : 'An unexpected error occurred');
+    } finally {
+      setExecutionIntelligenceLoading(false);
+    }
+  }
+
+  // Refresh both simultaneously
+  async function refreshAll() {
+    await Promise.all([
+      refreshGoalHealth(),
+      refreshExecutionIntelligence(),
+    ]);
+  }
+
+  return (
+    <div className="min-h-screen bg-bg-primary">
+      {/* Header */}
+      <div className="border-b border-white/5 bg-bg-card">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <BarChart3 size={24} className="text-accent" />
+              <h1 className="text-2xl font-bold text-text-primary">Progress Analytics</h1>
+            </div>
+            <button
+              onClick={refreshAll}
+              disabled={goalHealthLoading || executionIntelligenceLoading}
+              className="rounded-lg border border-white/10 bg-bg-secondary px-4 py-2 text-sm font-medium text-text-secondary transition-all hover:border-white/20 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Refresh All
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Goal Health */}
+          <div>
+            <div className="mb-3 flex items-center gap-2">
+              <TrendingUp size={16} className="text-success" />
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary/60">
+                Goal Health
+              </h2>
+            </div>
+            <GoalHealthCard
+              score={goalHealth}
+              history={goalHealthHistory}
+              loading={goalHealthLoading}
+              error={goalHealthError}
+              onRefresh={refreshGoalHealth}
+            />
+          </div>
+
+          {/* Execution Intelligence */}
+          <div>
+            <div className="mb-3 flex items-center gap-2">
+              <Brain size={16} className="text-accent" />
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary/60">
+                Execution Intelligence
+              </h2>
+            </div>
+            <ExecutionIntelligenceCard
+              analysis={executionIntelligence}
+              loading={executionIntelligenceLoading}
+              error={executionIntelligenceError}
+              onRefresh={refreshExecutionIntelligence}
+            />
+          </div>
+        </div>
+
+        {/* Additional Insights Section */}
+        <div className="mt-8 rounded-2xl border border-white/5 bg-bg-card p-6">
+          <h3 className="mb-4 text-lg font-bold text-text-primary">Quick Insights</h3>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {/* Interview Readiness */}
+            {executionIntelligence && (
+              <div className="rounded-lg border border-white/5 bg-bg-secondary p-4">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-text-secondary/60">
+                  Interview Readiness
+                </p>
+                <p className="text-3xl font-bold text-accent">
+                  {executionIntelligence.interviewReadiness}%
+                </p>
+              </div>
+            )}
+
+            {/* Goal Health Score */}
+            {goalHealth && (
+              <div className="rounded-lg border border-white/5 bg-bg-secondary p-4">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-text-secondary/60">
+                  Goal Health
+                </p>
+                <p className="text-3xl font-bold text-success">
+                  {goalHealth.score}/100
+                </p>
+              </div>
+            )}
+
+            {/* Consistency Rate */}
+            {executionIntelligence && (
+              <div className="rounded-lg border border-white/5 bg-bg-secondary p-4">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-text-secondary/60">
+                  Consistency
+                </p>
+                <p className="text-3xl font-bold text-text-primary">
+                  85%
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

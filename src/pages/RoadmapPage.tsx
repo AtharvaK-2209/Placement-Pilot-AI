@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -18,19 +18,27 @@ import {
   Star,
   RefreshCw,
   CheckCircle2,
+  Lock,
 } from 'lucide-react';
 import type { RoadmapResponse, RoadmapWeek } from '../ai/schemas/roadmap.schema';
 import type { GoalInput } from '../types/goal';
-import { ProgressService }    from '../services/progressService';
-import { XPService }          from '../services/xpService';
-import { StreakService }      from '../services/streakService';
-import { AchievementService } from '../services/achievementService';
-import { RoadmapService }     from '../services/roadmapService';
-import { useRepository }      from '../hooks/useRepository';
-import { useRoadmapRepository } from '../hooks/useRoadmapRepository';
+import { ProgressService }         from '../services/progressService';
+import { XPService }               from '../services/xpService';
+import { StreakService }            from '../services/streakService';
+import { AchievementService }      from '../services/achievementService';
+import { RoadmapService }          from '../services/roadmapService';
+import { RoadmapProgressService }  from '../services/roadmapProgressService';
+import { useRepository }           from '../hooks/useRepository';
+import { useRoadmapRepository }    from '../hooks/useRoadmapRepository';
+import { useRoadmapProgressRepository } from '../hooks/useRoadmapProgressRepository';
+import type { RoadmapProgress }    from '../types/roadmapProgress';
 import { useAuth }            from '../contexts/AuthContext';
 import { replanRoadmap }      from '../ai/dynamicReplanning';
 import type { ReplanResult }  from '../ai/dynamicReplanning';
+import { useGoalHealth }      from '../hooks/useGoalHealth';
+import { useDeadlineRescue }  from '../hooks/useDeadlineRescue';
+import GoalHealthCard          from '../components/GoalHealthCard';
+import DeadlineRescueCard      from '../components/DeadlineRescueCard';
 import type { WeekProgress, StreakState, Achievement } from '../types/progress';
 
 // ─── Router state ─────────────────────────────────────────────────────────────
@@ -92,18 +100,36 @@ function ProgressBar({ percent, color = 'bg-accent' }: { percent: number; color?
 
 // ─── Week Card ────────────────────────────────────────────────────────────────
 
-function WeekCard({ week, weekProgress }: { week: RoadmapWeek; weekProgress?: WeekProgress }) {
+function WeekCard({ week, weekProgress, weekStatus }: {
+  week: RoadmapWeek;
+  weekProgress?: WeekProgress;
+  weekStatus?: import('../types/roadmapProgress').WeekExecutionStatus;
+}) {
   const [expanded, setExpanded] = useState(false);
-  const pct = weekProgress?.completionPercent ?? 0;
+  const pct  = weekProgress?.completionPercent ?? 0;
   const done = weekProgress?.completed ?? false;
+  const isLocked = weekStatus?.status === 'locked';
 
   return (
-    <Card>
+    <Card className={isLocked ? 'opacity-50' : ''}>
+      {/* Lock banner */}
+      {isLocked && (
+        <div className="flex items-center gap-2 border-b border-white/5 px-5 py-2.5">
+          <Lock size={12} className="text-text-secondary/50" />
+          <p className="text-xs text-text-secondary/50">
+            Complete Week {week.week - 1} to unlock
+          </p>
+        </div>
+      )}
       {/* Header row — always visible */}
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-start justify-between gap-4 p-5 text-left transition-colors duration-150 hover:bg-white/2"
+        onClick={() => !isLocked && setExpanded((v) => !v)}
+        disabled={isLocked}
+        className={[
+          'flex w-full items-start justify-between gap-4 p-5 text-left transition-colors duration-150',
+          isLocked ? 'cursor-not-allowed' : 'hover:bg-white/2',
+        ].join(' ')}
       >
         <div className="flex items-start gap-4">
           {/* Week number badge */}
@@ -149,14 +175,31 @@ function WeekCard({ week, weekProgress }: { week: RoadmapWeek; weekProgress?: We
               <p className="text-xs italic text-text-secondary/50">{week.focusNote}</p>
             )}
 
-            {/* Week progress bar */}
-            {pct > 0 && (
-              <div className="mt-1 flex items-center gap-2">
-                <div className="flex-1">
-                  <ProgressBar percent={pct} color={done ? 'bg-success' : 'bg-accent'} />
+            {/* Week progress display */}
+            {(pct > 0 || (weekStatus?.generatedDays ?? 0) > 0) && (
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <ProgressBar percent={pct} color={done ? 'bg-success' : 'bg-accent'} />
+                  </div>
+                  <span className="text-xs text-text-secondary/50">{pct}%</span>
+                  {done && <span className="rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">✓</span>}
                 </div>
-                <span className="text-xs text-text-secondary/50">{pct}%</span>
-                {done && <span className="rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">✓</span>}
+                
+                {/* Daily mission progress details */}
+                {weekStatus && ((weekStatus.generatedDays ?? 0) > 0 || (weekStatus.completedDays ?? 0) > 0) && (
+                  <div className="flex items-center gap-3 text-xs text-text-secondary/60">
+                    <span className="flex items-center gap-1">
+                      <Calendar size={10} />
+                      {weekStatus.completedDays ?? 0}/{weekStatus.generatedDays ?? 0} days completed
+                    </span>
+                    {(weekStatus.generatedDays ?? 0) < 7 && (
+                      <span className="text-text-secondary/40">
+                        ({7 - (weekStatus.generatedDays ?? 0)} days not generated)
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -234,9 +277,39 @@ function WeekCard({ week, weekProgress }: { week: RoadmapWeek; weekProgress?: We
 export default function RoadmapPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as RoadmapLocationState | null;
-  const roadmapResult = state?.roadmapResult;
-  const goalInput = state?.goalInput;
+  
+  // ── Restore state from sessionStorage if location.state is missing ──
+  const locationState = location.state as RoadmapLocationState | null;
+  const [persistedState, setPersistedState] = useState<RoadmapLocationState | null>(() => {
+    if (locationState) {
+      // Save to sessionStorage for recovery
+      sessionStorage.setItem('pp_roadmap_state', JSON.stringify(locationState));
+      return locationState;
+    }
+    // Try to recover from sessionStorage
+    const saved = sessionStorage.getItem('pp_roadmap_state');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as RoadmapLocationState;
+        console.log('[RoadmapPage] Restored state from sessionStorage');
+        return parsed;
+      } catch (e) {
+        console.error('[RoadmapPage] Failed to parse saved state:', e);
+      }
+    }
+    return null;
+  });
+
+  // Update state when location.state changes
+  useEffect(() => {
+    if (locationState) {
+      sessionStorage.setItem('pp_roadmap_state', JSON.stringify(locationState));
+      setPersistedState(locationState);
+    }
+  }, [locationState]);
+
+  const roadmapResult = persistedState?.roadmapResult;
+  const goalInput = persistedState?.goalInput;
 
   // ── Guard ─────────────────────────────────────────────────────────────────
   if (!roadmapResult) {
@@ -299,11 +372,19 @@ export default function RoadmapPage() {
   const { user }        = useAuth();
   const repo            = useRepository();
   const roadmapRepo     = useRoadmapRepository();
-  const progressSvc     = new ProgressService(repo);
-  const xpSvc           = new XPService(repo);
-  const streakSvc       = new StreakService(repo);
-  const achievementSvc  = new AchievementService(repo);
-  const roadmapSvc      = new RoadmapService(roadmapRepo);
+  const roadmapPRepo    = useRoadmapProgressRepository();
+  const progressSvc     = useMemo(() => new ProgressService(repo),    [repo]);
+  const xpSvc           = useMemo(() => new XPService(repo),          [repo]);
+  const streakSvc       = useMemo(() => new StreakService(repo),      [repo]);
+  const achievementSvc  = useMemo(() => new AchievementService(repo), [repo]);
+  const roadmapSvc      = useMemo(() => new RoadmapService(roadmapRepo), [roadmapRepo]);
+  const roadmapPSvc     = useMemo(() => new RoadmapProgressService(roadmapPRepo, repo), [roadmapPRepo, repo]);
+
+  // ── Goal Health ───────────────────────────────────────────────────────────
+  const { score: healthScore, history: healthHistory, loading: healthLoading, error: healthError, refresh: refreshHealth, loadCached: loadCachedHealth } = useGoalHealth();
+
+  // ── Deadline Rescue ───────────────────────────────────────────────────────
+  const { strategy: rescueStrategy, loading: rescueLoading, error: rescueError, checkActivation, activate: activateRescue, loadCached: loadCachedRescue, deactivate: deactivateRescue } = useDeadlineRescue();
 
   // ── Progress state ────────────────────────────────────────────────────────
   const [weekProgressMap, setWeekProgressMap] = useState<Record<number, WeekProgress>>({});
@@ -312,23 +393,41 @@ export default function RoadmapPage() {
   const [levelInfo,  setLevelInfo]  = useState({ level: 1, currentXP: 0, nextLevelXP: 500, progress: 0 });
   const [achievements, setAchievements] = useState<Achievement[]>([]);
 
+  // ── Roadmap progress (week unlock) ────────────────────────────────────────
+  const [roadmapProgress, setRoadmapProgress] = useState<RoadmapProgress | null>(null);
+
   // ── Replanning state ──────────────────────────────────────────────────────
   const [replanning,    setReplanning]    = useState(false);
   const [replanResult,  setReplanResult]  = useState<ReplanResult | null>(null);
   const [activeRoadmap, setActiveRoadmap] = useState(r); // tracks current (possibly replanned) roadmap
   const [activeVersion, setActiveVersion] = useState<number>(1); // version number of active roadmap
 
+  // ── Progress refresh key to trigger reloads ──────────────────────────────
+  const [refreshKey, setRefreshKey] = useState(0);
+
   useEffect(() => {
     async function loadProgress() {
+      console.log('[RoadmapPage] Loading progress data (refreshKey:', refreshKey, ')');
+      
       const map: Record<number, WeekProgress> = {};
       for (const week of activeRoadmap.weeks) {
-        map[week.week] = await progressSvc.getWeekProgress(week.week, week.title);
+        const weekProgress = await progressSvc.getWeekProgress(week.week, week.title);
+        map[week.week] = weekProgress;
+        console.log(`[RoadmapPage] Week ${week.week}: ${weekProgress.completedDays}/7 days, ${weekProgress.completionPercent}% complete`);
       }
       setWeekProgressMap(map);
       setTotalXP(await xpSvc.getTotal());
       setStreak(await streakSvc.getStreak());
       setLevelInfo(await xpSvc.getLevelInfo());
       setAchievements(await achievementSvc.getAll());
+
+      // ── Init roadmap progress + load week statuses ───────────────────────
+      const rp = await roadmapPSvc.initRoadmapProgress(activeRoadmap.totalWeeks);
+      // Recompute from saved day progress on every load
+      const updatedRp = await roadmapPSvc.recomputeAndUnlock(activeRoadmap.totalWeeks);
+      setRoadmapProgress(updatedRp ?? rp);
+
+      console.log(`[RoadmapPage] Roadmap progress updated: ${(updatedRp ?? rp).completedWeeks}/${activeRoadmap.totalWeeks} weeks, unlocked through week ${(updatedRp ?? rp).unlockedWeek}`);
 
       // Load active version number; save V1 if this is the first load
       const versionNum = await roadmapSvc.getActiveVersionNumber();
@@ -338,10 +437,39 @@ export default function RoadmapPage() {
       } else {
         setActiveVersion(versionNum);
       }
+
+      // Load cached health score (non-blocking)
+      loadCachedHealth();
+      
+      // Load cached rescue strategy (non-blocking)
+      loadCachedRescue();
     }
     loadProgress();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeRoadmap.weeks, repo, roadmapRepo]);
+  }, [activeRoadmap.weeks, repo, roadmapRepo, roadmapPRepo, refreshKey]);
+
+  // ── Auto-refresh when page gains focus (user returns from daily mission) ───
+  useEffect(() => {
+    function handleFocus() {
+      console.log('[RoadmapPage] Page focused, triggering refresh');
+      setRefreshKey(prev => prev + 1);
+    }
+
+    function handleVisibilityChange() {
+      if (!document.hidden) {
+        console.log('[RoadmapPage] Page visible, triggering refresh');
+        setRefreshKey(prev => prev + 1);
+      }
+    }
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   // ── Replan handler ────────────────────────────────────────────────────────
   async function handleReplan() {
@@ -389,6 +517,10 @@ export default function RoadmapPage() {
       setActiveVersion(saved.version);
       setActiveRoadmap(result.data.updatedRoadmap);
       setReplanResult(result.data);
+      // Re-init progress for new roadmap size
+      const rp = await roadmapPSvc.initRoadmapProgress(result.data.updatedRoadmap.totalWeeks);
+      setRoadmapProgress(rp);
+      refreshHealth(goalInput?.deadline);
     }
     setReplanning(false);
   }
@@ -541,12 +673,62 @@ export default function RoadmapPage() {
           </div>
         )}
 
+        {/* ── Goal Health Card ── */}
+        <div className="mb-8 animate-fade-up" style={{ animationDelay: '110ms' }}>
+          <GoalHealthCard
+            score={healthScore}
+            history={healthHistory}
+            loading={healthLoading}
+            error={healthError}
+            onRefresh={async () => {
+              await refreshHealth(goalInput?.deadline);
+              
+              // Automatic rescue check after health refresh
+              if (healthScore && goalInput?.deadline) {
+                const check = await checkActivation(
+                  healthScore.score,
+                  healthScore.level,
+                  healthScore.burnoutRisk ?? 'low',
+                  healthScore.deadlineStatus ?? 'on_track',
+                  healthScore.estimatedCompletionDate ?? '',
+                  healthScore.estimatedDaysRemaining ?? 0,
+                  goalInput.deadline,
+                );
+                
+                // Auto-activate rescue if needed
+                if (check?.shouldActivate && !rescueStrategy) {
+                  await activateRescue(
+                    healthScore.score,
+                    healthScore.level,
+                    healthScore.burnoutRisk ?? 'low',
+                    healthScore.deadlineStatus ?? 'on_track',
+                    healthScore.estimatedCompletionDate ?? '',
+                    healthScore.estimatedDaysRemaining ?? 0,
+                    goalInput.deadline,
+                  );
+                }
+              }
+            }}
+          />
+        </div>
+
+        {/* ── Deadline Rescue Card ── */}
+        {rescueStrategy && (
+          <div className="mb-8 animate-fade-up" style={{ animationDelay: '115ms' }}>
+            <DeadlineRescueCard
+              strategy={rescueStrategy}
+              loading={rescueLoading}
+              error={rescueError}
+              onDeactivate={deactivateRescue}
+            />
+          </div>
+        )}
+
         {/* ── Week cards ── */}
         <div
           className="flex flex-col gap-4 animate-fade-up"
           style={{ animationDelay: '120ms' }}
-        >
-          <div className="mb-2 flex items-center gap-2.5">
+        >          <div className="mb-2 flex items-center gap-2.5">
             <BookOpen size={15} className="text-accent" />
             <h2 className="text-xs font-semibold uppercase tracking-widest text-text-secondary">
               Week-by-Week Plan
@@ -554,7 +736,12 @@ export default function RoadmapPage() {
           </div>
 
           {activeRoadmap.weeks.map((week) => (
-            <WeekCard key={week.week} week={week} weekProgress={weekProgressMap[week.week]} />
+            <WeekCard
+              key={week.week}
+              week={week}
+              weekProgress={weekProgressMap[week.week]}
+              weekStatus={roadmapProgress?.weekStatuses.find((s) => s.weekNumber === week.week)}
+            />
           ))}
         </div>
 
@@ -628,6 +815,7 @@ export default function RoadmapPage() {
                   weeklyHours:   goalInput?.weeklyHours ?? Math.round(activeRoadmap.totalHours / activeRoadmap.totalWeeks),
                   executionMode: activeRoadmap.executionMode,
                   roadmapTitle:  activeRoadmap.title,
+                  totalWeeks:    activeRoadmap.totalWeeks,
                 },
               });
             }}
