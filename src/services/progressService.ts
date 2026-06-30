@@ -93,8 +93,9 @@ export class ProgressService {
     taskTitle:  string,
     completed = true,
   ): Promise<DayProgress | null> {
-    await this.repo.updateTask(weekNumber, dayNumber, taskTitle, completed);
-    return this.repo.getDayProgress(weekNumber, dayNumber);
+    // ✅ FIXED: updateTask now returns the updated DayProgress directly
+    // This avoids reading from Firestore's IndexedDB cache which may be stale
+    return this.repo.updateTask(weekNumber, dayNumber, taskTitle, completed);
   }
 
   // ── Week progress ────────────────────────────────────────────────────────────

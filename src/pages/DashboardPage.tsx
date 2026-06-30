@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboard } from '../hooks/useDashboard';
 import { useGamification } from '../hooks/useGamification';
+import { AuthenticatedLayout } from '../components/AuthenticatedLayout';
 import { GamificationSummary } from '../components/gamification';
 import { DashboardSkeleton } from '../components/SkeletonLoader';
 import { NoDataEmptyState } from '../components/EmptyState';
@@ -48,20 +49,26 @@ export default function DashboardPage() {
 
   // ─── Loading State ───────────────────────────────────────────────────────────
   if (loading) {
-    return <DashboardSkeleton />;
+    return (
+      <AuthenticatedLayout>
+        <DashboardSkeleton />
+      </AuthenticatedLayout>
+    );
   }
 
   // ─── Error State ─────────────────────────────────────────────────────────────
   if (error || !data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-bg-primary px-6">
-        <div className="max-w-md">
-          <NoDataEmptyState 
-            message={error?.message || 'Unable to load dashboard data'} 
-            onRefresh={refresh}
-          />
+      <AuthenticatedLayout>
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <div className="max-w-md">
+            <NoDataEmptyState 
+              message={error?.message || 'Unable to load dashboard data'} 
+              onRefresh={refresh}
+            />
+          </div>
         </div>
-      </div>
+      </AuthenticatedLayout>
     );
   }
 
@@ -89,8 +96,8 @@ export default function DashboardPage() {
 
   // ─── Main Dashboard UI ───────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-bg-primary">
-      <div className="mx-auto max-w-7xl px-6 py-12">
+    <AuthenticatedLayout>
+      <div>
         
         {/* ═══════════════════════════════════════════════════════════════════ */}
         {/* HERO SECTION */}
@@ -521,6 +528,6 @@ export default function DashboardPage() {
           </button>
         </div>
       </div>
-    </div>
+    </AuthenticatedLayout>
   );
 }

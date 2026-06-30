@@ -42,7 +42,16 @@ export function calculateETA(params: {
   const { completedWeeks, totalWeeks, deadline, currentDate } = params;
 
   const today = currentDate ? new Date(currentDate) : new Date();
-  const deadlineDate = new Date(deadline);
+  
+  // DEFENSIVE: Ensure deadline is a valid date string
+  let deadlineDate: Date;
+  if (!deadline || isNaN(new Date(deadline).getTime())) {
+    // If deadline is invalid, calculate a default one (8 weeks from now)
+    deadlineDate = new Date();
+    deadlineDate.setDate(deadlineDate.getDate() + (56)); // 8 weeks
+  } else {
+    deadlineDate = new Date(deadline);
+  }
 
   // Calculate remaining work
   const remainingWeeks = Math.max(0, totalWeeks - completedWeeks);

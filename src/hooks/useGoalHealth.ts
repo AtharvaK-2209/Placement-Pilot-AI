@@ -62,6 +62,7 @@ export function useGoalHealth() {
 
   // ── refresh: calls agent, computes trend, persists latest + history ────────
   const refresh = useCallback(async (deadline?: string) => {
+    console.group('[GoalHealth] START refresh hook');
     setState((s) => ({ ...s, loading: true, error: null }));
 
     try {
@@ -71,6 +72,8 @@ export function useGoalHealth() {
       const achievementSvc = new AchievementService(repo);
       const roadmapSvc     = new RoadmapService(roadmapRepo);
 
+      // Step 1: Load all required data
+      console.log('[GoalHealth] Step 1: Loading data...');
       const [progress, streak, achievements, levelInfo, versions, pointer] =
         await Promise.all([
           repo.getProgress(),
@@ -81,8 +84,28 @@ export function useGoalHealth() {
           roadmapSvc.getActiveVersionNumber(),
         ]);
 
+      // DIAGNOSTIC: Log user and roadmap info
+      console.log('[GoalHealth] DIAGNOSTIC - User/Roadmap Info:', {
+        userId: user?.uid,
+        userExists: !!user,
+        progressExists: !!progress,
+        streakExists: !!streak,
+        roadmapRepoExists: !!roadmapRepo,
+        versionsCount: versions?.length,
+        pointer: pointer
+      });
+
+      console.log('[GoalHealth] Step 2: Loading active roadmap...');
       const activeRoadmap = await roadmapSvc.getActiveRoadmap();
+      console.log('[GoalHealth] DIAGNOSTIC - Active Roadmap:', {
+        exists: !!activeRoadmap,
+        roadmapTitle: activeRoadmap?.title,
+        totalWeeks: activeRoadmap?.totalWeeks,
+        executionMode: activeRoadmap?.executionMode
+      });
+      
       if (!activeRoadmap) {
+        console.error('[GoalHealth] ERROR: No active roadmap found');
         setState((s) => ({ ...s, loading: false, error: 'No active roadmap found.' }));
         return;
       }
@@ -91,21 +114,52 @@ export function useGoalHealth() {
       const activeVersion = pointer ?? 1;
       const replanCount   = Math.max(0, versions.length - 1);
 
+      // DIAGNOSTIC: Log basic roadmap info
+      console.log('[GoalHealth] DIAGNOSTIC - Roadmap Base Info:', {
+        totalWeeks,
+        activeVersion,
+        replanCount,
+        versionsLength: versions?.length
+      });
+
+      console.log('[GoalHealth] Step 3: Calculating progress...');
       let completedWeeks = 0;
       let startedDays    = 0;
       let completedDays  = 0;
 
       if (progress) {
+        // DIAGNOSTIC: Log progress structure
+        console.log('[GoalHealth] DIAGNOSTIC - Progress Structure:', {
+          hasProgress: !!progress,
+          roadmapTitle: progress?.roadmapTitle,
+          daysCount: progress?.days ? Object.keys(progress.days).length : 0,
+          daysKeys: progress?.days ? Object.keys(progress.days) : []
+        });
+
+        // Calculate completed weeks
         for (let w = 1; w <= totalWeeks; w++) {
           const wp = await progressSvc.getWeekProgress(w, '');
           if (wp.completionPercent === 100) completedWeeks++;
         }
-        Object.values(progress.days).forEach((day) => {
-          startedDays++;
-          if (day.completionPercent === 100) completedDays++;
-        });
+        
+        // Count started and completed days
+        if (progress.days) {
+          Object.values(progress.days).forEach((day) => {
+            startedDays++;
+            if (day.completionPercent === 100) completedDays++;
+          });
+        }
       }
 
+      // DIAGNOSTIC: Log progress calculation results
+      console.log('[GoalHealth] DIAGNOSTIC - Progress Calculation:', {
+        completedWeeks,
+        startedDays,
+        completedDays,
+        totalWeeks
+      });
+
+      console.log('[GoalHealth] Step 4: Calculating metrics...');
       const overallCompletionPct = totalWeeks > 0
         ? Math.round((completedWeeks / totalWeeks) * 100) : 0;
       const remainingWeeks  = Math.max(0, totalWeeks - completedWeeks);
@@ -113,6 +167,26 @@ export function useGoalHealth() {
         ? Math.round((completedDays / startedDays) * 100) : 0;
       const today           = new Date().toISOString().split('T')[0];
       const streakActiveToday = streak.lastActiveDate === today;
+
+      // DIAGNOSTIC: Log calculated metrics
+      console.log('[GoalHealth] DIAGNOSTIC - Core Metrics:', {
+        overallCompletionPct,
+        remainingWeeks,
+        consistencyRate,
+        today,
+        streakActiveToday,
+        streak: streak ? {
+          currentStreak: streak.currentStreak,
+          longestStreak: streak.longestStreak,
+          lastActiveDate: streak.lastActiveDate
+        } : null,
+        achievementsCount: achievements?.length,
+        levelInfo: levelInfo ? {
+          level: levelInfo.level,
+          currentXP: levelInfo.currentXP,
+          nextLevelXP: levelInfo.nextLevelXP
+        } : null
+      });
 
       // ── Phase 8.1: Calculate additional metrics ───────────────────────────
       const avgWeeklyProgress = completedWeeks > 0 && startedDays > 0
@@ -127,8 +201,62 @@ export function useGoalHealth() {
         futureDate.setDate(futureDate.getDate() + (remainingWeeks * 7));
         return futureDate.toISOString().split('T')[0];
       })();
+      
+      // DIAGNOSTIC: Validate deadline format
+      console.log('[GoalHealth] DIAGNOSTIC - Effective Deadline:', {
+        deadlineParam: deadline,
+        effectiveDeadline,
+        isValidDate: !isNaN(new Date(effectiveDeadline).getTime())
+      });
 
-      // ── Call agent ────────────────────────────────────────────────────────
+      // DIAGNOSTIC: Log all inputs for generateGoalHealth
+      console.log('[GoalHealth] DIAGNOSTIC - generateGoalHealth Inputs:', {
+        executionMode: activeRoadmap.executionMode,
+        roadmapVersion: activeVersion,
+        totalWeeks,
+        completedWeeks,
+        overallCompletionPct,
+        remainingWeeks,
+        totalXP: levelInfo?.currentXP + (levelInfo?.level - 1) * 500,
+        level: levelInfo?.level,
+        currentStreak: streak?.currentStreak,
+        longestStreak: streak?.longestStreak,
+        achievementCount: achievements?.length,
+        consistencyRate,
+        replanCount,
+        streakActiveToday,
+        deadline: effectiveDeadline,
+        avgWeeklyProgress,
+        remainingHours,
+        userId: user?.uid
+      });
+
+      console.log('[GoalHealth] Step 5: Calling generateGoalHealth...');
+      
+      // DEFENSIVE: Ensure all required fields are present
+      if (!levelInfo) {
+        console.error('[GoalHealth] ERROR: levelInfo is undefined');
+        setState((s) => ({ ...s, loading: false, error: 'Missing level information.' }));
+        console.groupEnd();
+        return;
+      }
+      
+      if (!streak) {
+        console.error('[GoalHealth] ERROR: streak is undefined');
+        setState((s) => ({ ...s, loading: false, error: 'Missing streak information.' }));
+        console.groupEnd();
+        return;
+      }
+      
+      // Ensure numeric values are valid
+      const calculatedXP = levelInfo.currentXP + (levelInfo.level - 1) * 500;
+      if (isNaN(calculatedXP) || !isFinite(calculatedXP)) {
+        console.error('[GoalHealth] ERROR: Invalid XP calculation:', { levelInfo, calculatedXP });
+        setState((s) => ({ ...s, loading: false, error: 'Invalid XP calculation.' }));
+        console.groupEnd();
+        return;
+      }
+      
       const result = await generateGoalHealth({
         executionMode:        activeRoadmap.executionMode,
         roadmapVersion:       activeVersion,
@@ -136,11 +264,11 @@ export function useGoalHealth() {
         completedWeeks,
         overallCompletionPct,
         remainingWeeks,
-        totalXP:              levelInfo.currentXP + (levelInfo.level - 1) * 500,
+        totalXP:              calculatedXP,
         level:                levelInfo.level,
         currentStreak:        streak.currentStreak,
         longestStreak:        streak.longestStreak,
-        achievementCount:     achievements.length,
+        achievementCount:     achievements?.length || 0,
         consistencyRate,
         replanCount,
         streakActiveToday,
@@ -188,9 +316,13 @@ export function useGoalHealth() {
       const history = await healthRepo.getHistory();
 
       setState({ score: result.data, history, loading: false, error: null });
+      console.log('[GoalHealth] SUCCESS: Goal health computed and saved');
+      console.groupEnd();
     } catch (e) {
-      console.error('[useGoalHealth] unexpected error:', e);
+      console.error('[GoalHealth] ERROR: Unexpected exception:', e);
+      console.error('[GoalHealth] ERROR Stack:', e instanceof Error ? e.stack : 'No stack');
       setState((s) => ({ ...s, loading: false, error: 'Unexpected error.' }));
+      console.groupEnd();
     }
   }, [repo, roadmapRepo, healthRepo, user]);
 

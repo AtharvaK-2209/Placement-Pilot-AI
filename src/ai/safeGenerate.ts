@@ -93,6 +93,24 @@ export async function safeGenerateContent(
       model: MODEL_NAME,
       ...params,
     });
+    
+    // ── DIAGNOSTIC LOGGING ──────────────────────────────────────────────────
+    console.log('[safeGenerate] === PRIMARY MODEL RESPONSE ===');
+    console.log('[safeGenerate] candidates count:', response.candidates?.length ?? 0);
+    if (response.candidates?.[0]) {
+      const parts = response.candidates[0].content?.parts;
+      console.log('[safeGenerate] first candidate parts count:', parts?.length ?? 0);
+      if (parts?.[0]) {
+        const text = (parts[0] as Record<string, unknown>).text as string;
+        console.log('[safeGenerate] first part text length:', text?.length ?? 0);
+        console.log('[safeGenerate] first part text starts:', text?.slice(0, 150));
+        console.log('[safeGenerate] first part text ends:', text?.slice(-100));
+      }
+    }
+    console.log('[safeGenerate] usageMetadata:', response.usageMetadata);
+    console.log('[safeGenerate] finishReason:', response.candidates?.[0]?.finishReason);
+    console.log('[safeGenerate] === END RESPONSE ===');
+    
     console.debug(`[safeGenerate] ✓ served by ${MODEL_NAME}`);
     return response;
   } catch (err1) {
@@ -125,6 +143,24 @@ export async function safeGenerateContent(
     model: FALLBACK_MODEL,
     ...params,
   });
+  
+  // ── DIAGNOSTIC LOGGING ──────────────────────────────────────────────────
+  console.log('[safeGenerate] === FALLBACK MODEL RESPONSE ===');
+  console.log('[safeGenerate] candidates count:', response.candidates?.length ?? 0);
+  if (response.candidates?.[0]) {
+    const parts = response.candidates[0].content?.parts;
+    console.log('[safeGenerate] first candidate parts count:', parts?.length ?? 0);
+    if (parts?.[0]) {
+      const text = (parts[0] as Record<string, unknown>).text as string;
+      console.log('[safeGenerate] first part text length:', text?.length ?? 0);
+      console.log('[safeGenerate] first part text starts:', text?.slice(0, 150));
+      console.log('[safeGenerate] first part text ends:', text?.slice(-100));
+    }
+  }
+  console.log('[safeGenerate] usageMetadata:', response.usageMetadata);
+  console.log('[safeGenerate] finishReason:', response.candidates?.[0]?.finishReason);
+  console.log('[safeGenerate] === END FALLBACK RESPONSE ===');
+  
   console.debug(`[safeGenerate] ✓ served by fallback ${FALLBACK_MODEL}`);
   return response;
 }

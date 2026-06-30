@@ -7,6 +7,7 @@
 
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, AlertTriangle } from 'lucide-react';
+import { AuthenticatedLayout } from '../AuthenticatedLayout';
 import { useGamification } from '../../hooks/useGamification';
 
 import LevelCard from './LevelCard';
@@ -52,8 +53,8 @@ export default function GamificationDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-primary">
-      <div className="mx-auto max-w-7xl px-6 py-12">
+    <AuthenticatedLayout>
+      <div>
         {/* Header */}
         <div className="mb-12 animate-[fade-up_0.5s_ease_both]">
           <button
@@ -155,6 +156,6 @@ export default function GamificationDashboard() {
           </div>
         </div>
       </div>
-    </div>
+    </AuthenticatedLayout>
   );
 }

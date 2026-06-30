@@ -58,6 +58,24 @@ function defaultProgress(roadmapTitle: string): UserProgress {
   };
 }
 
+/**
+ * Sanitize an object for Firestore by removing undefined values.
+ * Firestore does not allow undefined — we must omit such fields entirely.
+ */
+function sanitizeForFirestore(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sanitizeForFirestore);
+  
+  const sanitized: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      sanitized[key] = sanitizeForFirestore(value);
+    }
+  }
+  return sanitized;
+}
+
 // ─── Implementation ────────────────────────────────────────────────────────────
 
 export class FirestoreProgressRepository implements ProgressRepository {
@@ -78,19 +96,36 @@ export class FirestoreProgressRepository implements ProgressRepository {
   private async read(): Promise<UserProgress | null> {
     try {
       const snap = await getDoc(this.ref());
-      return snap.exists() ? (snap.data() as UserProgress) : null;
+      if (snap.exists()) {
+        const progress = snap.data() as UserProgress;
+        console.log(`[FirestoreProgressRepository] ✓ Read progress from Firestore, days count: ${Object.keys(progress.days).length}`);
+        return progress;
+      } else {
+        console.log(`[FirestoreProgressRepository] No progress document found in Firestore`);
+        return null;
+      }
     } catch (e) {
-      console.error('[FirestoreProgressRepository] read failed:', e);
-      return null;
+      console.error('[FirestoreProgressRepository] ✗ read failed:', e);
+      throw new Error(`Firestore read failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
   }
 
   private async write(progress: UserProgress): Promise<void> {
     try {
       progress.updatedAt = new Date().toISOString();
-      await setDoc(this.ref(), progress);
+      console.log(`[FirestoreProgressRepository] Writing progress to Firestore, days count: ${Object.keys(progress.days).length}`);
+      
+      // Sanitize the progress object to remove any undefined values
+      // Firestore does not allow undefined — they must be omitted entirely
+      const sanitized = sanitizeForFirestore(progress);
+      
+      console.log(`[FirestoreProgressRepository] Sanitized payload before Firestore write`);
+      await setDoc(this.ref(), sanitized);
+      console.log(`[FirestoreProgressRepository] ✓ Progress written successfully to Firestore`);
     } catch (e) {
-      console.error('[FirestoreProgressRepository] write failed:', e);
+      console.error('[FirestoreProgressRepository] ✗ write failed:', e);
+      // Re-throw the error so it can be caught by calling code
+      throw new Error(`Firestore write failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
   }
 
@@ -127,7 +162,10 @@ export class FirestoreProgressRepository implements ProgressRepository {
   async saveDayProgress(day: DayProgress): Promise<void> {
     const progress = await this.readOrInit();
     progress.days[dayKey(day.weekNumber, day.dayNumber)] = day;
-    return this.write(progress);
+    const key = dayKey(day.weekNumber, day.dayNumber);
+    console.log(`[FirestoreProgressRepository] Saving day progress for ${key}`);
+    await this.write(progress);
+    console.log(`[FirestoreProgressRepository] ✓ Day progress saved successfully for ${key}`);
   }
 
   async updateTask(
@@ -135,20 +173,35 @@ export class FirestoreProgressRepository implements ProgressRepository {
     dayNumber:  number,
     taskTitle:  string,
     completed:  boolean,
-  ): Promise<void> {
+  ): Promise<DayProgress> {  // ✅ CHANGED: Return DayProgress instead of void
     const progress = await this.readOrInit();
     const key = dayKey(weekNumber, dayNumber);
     const day = progress.days[key];
+    
+    console.log(`[FirestoreProgressRepository] updateTask for ${key}, taskTitle: "${taskTitle}", completed: ${completed}`);
+    console.log(`[FirestoreProgressRepository] Day exists in progress:`, !!day);
+    console.log(`[FirestoreProgressRepository] Total days in progress:`, Object.keys(progress.days).length);
+    
     if (!day) {
-      console.warn(`[FirestoreProgressRepository] updateTask: day ${key} not found`);
-      return;
+      console.error(`[FirestoreProgressRepository] ✗ updateTask: day ${key} not found in progress.days`);
+      console.error(`[FirestoreProgressRepository] Available days:`, Object.keys(progress.days));
+      throw new Error(`Failed to persist task completion: day ${key} not found. This may be a Firestore permissions issue or the day was never initialized.`);
     }
 
-    const updatedTasks: TaskCompletion[] = day.tasks.map((t) =>
-      t.taskTitle === taskTitle
-        ? { ...t, completed, completedAt: completed ? new Date().toISOString() : undefined }
-        : t,
-    );
+    const updatedTasks: TaskCompletion[] = day.tasks.map((t) => {
+      if (t.taskTitle === taskTitle) {
+        // Only include completedAt if the task is now complete
+        const updated: TaskCompletion = { 
+          ...t, 
+          completed 
+        };
+        if (completed) {
+          updated.completedAt = new Date().toISOString();
+        }
+        return updated;
+      }
+      return t;
+    });
 
     const completedCount    = updatedTasks.filter((t) => t.completed).length;
     const completionPercent = updatedTasks.length > 0
@@ -156,14 +209,23 @@ export class FirestoreProgressRepository implements ProgressRepository {
       : 0;
     const allDone = completedCount === updatedTasks.length && updatedTasks.length > 0;
 
-    progress.days[key] = {
+    const updatedDay: DayProgress = {  // ✅ CHANGED: Store updated day in variable
       ...day,
       tasks: updatedTasks,
       completionPercent,
-      completedAt: allDone && !day.completedAt ? new Date().toISOString() : day.completedAt,
+      // Only include completedAt if all tasks are done
+      ...(allDone && !day.completedAt ? { completedAt: new Date().toISOString() } : 
+           day.completedAt ? { completedAt: day.completedAt } : {}),
     };
+    
+    progress.days[key] = updatedDay;
 
-    return this.write(progress);
+    console.log(`[FirestoreProgressRepository] Writing updated progress for ${key}`);
+    await this.write(progress);
+    console.log(`[FirestoreProgressRepository] ✓ Task update persisted successfully for ${key}`);
+    
+    // ✅ CHANGED: Return the updated day directly from memory (not from Firestore cache)
+    return updatedDay;
   }
 
   // ── XP ──────────────────────────────────────────────────────────────────────

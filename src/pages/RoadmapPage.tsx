@@ -21,6 +21,7 @@ import {
   Lock,
   Sparkles,
 } from 'lucide-react';
+import { AuthenticatedLayout } from '../components/AuthenticatedLayout';
 import { NoRoadmapEmptyState } from '../components/EmptyState';
 import type { RoadmapResponse, RoadmapWeek } from '../ai/schemas/roadmap.schema';
 import type { GoalInput } from '../types/goal';
@@ -327,38 +328,27 @@ export default function RoadmapPage() {
   // ── Failure ───────────────────────────────────────────────────────────────
   if (!roadmapResult.success) {
     return (
-      <div className="min-h-screen bg-bg-primary font-sans text-text-primary">
-        <header className="sticky top-0 z-40 border-b border-white/5 bg-bg-primary/80 backdrop-blur-md">
-          <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-            <button
-              onClick={() => navigate(-1)}
-              className="flex items-center gap-2 text-sm text-text-secondary transition-colors hover:text-text-primary"
-            >
-              <ArrowLeft size={16} /> Back
-            </button>
-            <span className="text-sm font-semibold">
-              PlacementPilot <span className="text-accent">AI</span>
-            </span>
-          </div>
-        </header>
-        <main className="mx-auto flex max-w-3xl flex-col items-center justify-center px-6 py-28 text-center">
-          <div className="w-full rounded-2xl border border-danger/20 bg-danger/10 p-10">
-            <AlertTriangle size={36} className="mx-auto mb-4 text-danger" />
-            <h2 className="text-xl font-bold text-text-primary">
-              Failed to generate roadmap.
-            </h2>
-            <p className="mt-3 text-sm text-text-secondary">
-              Something went wrong while connecting to Gemini. Please try again.
-            </p>
-            <button
-              onClick={() => navigate(-1)}
-              className="mt-8 rounded-xl bg-accent px-10 py-3.5 text-sm font-semibold text-white shadow-lg shadow-accent/20 transition-all duration-200 hover:bg-accent/90 hover:-translate-y-0.5"
-            >
-              Try Again
-            </button>
-          </div>
-        </main>
-      </div>
+      <AuthenticatedLayout noPadding maxWidth="full">
+        <div className="min-h-screen bg-bg-primary font-sans text-text-primary">
+          <main className="mx-auto flex max-w-3xl flex-col items-center justify-center px-6 py-28 text-center">
+            <div className="w-full rounded-2xl border border-danger/20 bg-danger/10 p-10">
+              <AlertTriangle size={36} className="mx-auto mb-4 text-danger" />
+              <h2 className="text-xl font-bold text-text-primary">
+                Failed to generate roadmap.
+              </h2>
+              <p className="mt-3 text-sm text-text-secondary">
+                Something went wrong while connecting to Gemini. Please try again.
+              </p>
+              <button
+                onClick={() => navigate(-1)}
+                className="mt-8 rounded-xl bg-accent px-10 py-3.5 text-sm font-semibold text-white shadow-lg shadow-accent/20 transition-all duration-200 hover:bg-accent/90 hover:-translate-y-0.5"
+              >
+                Try Again
+              </button>
+            </div>
+          </main>
+        </div>
+      </AuthenticatedLayout>
     );
   }
 
@@ -523,25 +513,18 @@ export default function RoadmapPage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-primary font-sans text-text-primary">
-
-      {/* ── Top bar ── */}
-      <header className="sticky top-0 z-40 border-b border-white/5 bg-bg-primary/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-sm text-text-secondary transition-colors duration-200 hover:text-text-primary"
-          >
-            <ArrowLeft size={16} />
-            Back to Analysis
-          </button>
-          <span className="text-sm font-semibold">
-            PlacementPilot <span className="text-accent">AI</span>
-          </span>
-        </div>
-      </header>
+    <AuthenticatedLayout noPadding maxWidth="full">
+      <div className="min-h-screen bg-bg-primary font-sans text-text-primary">
 
       <main className="mx-auto max-w-4xl px-6 py-12">
+        {/* Contextual navigation */}
+        <button
+          onClick={() => navigate(-1)}
+          className="mb-8 flex items-center gap-2 text-sm text-text-secondary transition-colors duration-200 hover:text-text-primary"
+        >
+          <ArrowLeft size={16} />
+          Back to Analysis
+        </button>
 
         {/* ── Hero ── */}
         <div className="mb-10 animate-fade-up">
@@ -863,5 +846,6 @@ export default function RoadmapPage() {
 
       </main>
     </div>
+    </AuthenticatedLayout>
   );
 }

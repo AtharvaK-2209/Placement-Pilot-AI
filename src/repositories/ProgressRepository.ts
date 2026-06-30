@@ -68,13 +68,16 @@ export interface ProgressRepository {
    * Updates the completion state of a single task within a day.
    * The repository is responsible for recomputing completionPercent
    * and setting completedAt on the day when all tasks are done.
+   * 
+   * IMPORTANT: Returns the updated DayProgress directly from memory
+   * to avoid stale cache issues with Firestore's IndexedDB persistence.
    */
   updateTask(
     weekNumber:   number,
     dayNumber:    number,
     taskTitle:    string,
     completed:    boolean,
-  ): Promise<void>;
+  ): Promise<DayProgress>;  // ✅ CHANGED: Return DayProgress instead of void
 
   // ── XP ──────────────────────────────────────────────────────────────────────
 

@@ -140,22 +140,40 @@ export class LocalStorageProgressRepository implements ProgressRepository {
     dayNumber:  number,
     taskTitle:  string,
     completed:  boolean,
-  ): Promise<void> {
+  ): Promise<DayProgress> {  // ✅ CHANGED: Return DayProgress instead of void
     const progress = this.readOrInit();
     const key = dayKey(weekNumber, dayNumber);
     const day = progress.days[key];
 
     if (!day) {
       console.warn(`[LocalStorageProgressRepository] updateTask: day ${key} not found`);
-      return Promise.resolve();
+      // Return a default DayProgress if not found (should not happen in normal flow)
+      const defaultDay: DayProgress = {
+        weekNumber,
+        dayNumber,
+        missionTitle: 'Unknown',
+        tasks: [],
+        completionPercent: 0,
+        startedAt: new Date().toISOString(),
+      };
+      return Promise.resolve(defaultDay);
     }
 
     // Update the matching task
-    const updatedTasks: TaskCompletion[] = day.tasks.map((t) =>
-      t.taskTitle === taskTitle
-        ? { ...t, completed, completedAt: completed ? new Date().toISOString() : undefined }
-        : t,
-    );
+    const updatedTasks: TaskCompletion[] = day.tasks.map((t) => {
+      if (t.taskTitle === taskTitle) {
+        // Only include completedAt if the task is now complete
+        const updated: TaskCompletion = { 
+          ...t, 
+          completed 
+        };
+        if (completed) {
+          updated.completedAt = new Date().toISOString();
+        }
+        return updated;
+      }
+      return t;
+    });
 
     // Recompute completion percent
     const completedCount = updatedTasks.filter((t) => t.completed).length;
@@ -166,15 +184,21 @@ export class LocalStorageProgressRepository implements ProgressRepository {
 
     const allDone = completedCount === updatedTasks.length && updatedTasks.length > 0;
 
-    progress.days[key] = {
+    const updatedDay: DayProgress = {  // ✅ CHANGED: Store in variable
       ...day,
       tasks:             updatedTasks,
       completionPercent,
-      completedAt:       allDone && !day.completedAt ? new Date().toISOString() : day.completedAt,
+      // Only include completedAt if all tasks are done
+      ...(allDone && !day.completedAt ? { completedAt: new Date().toISOString() } : 
+           day.completedAt ? { completedAt: day.completedAt } : {}),
     };
+    
+    progress.days[key] = updatedDay;
 
     this.write(progress);
-    return Promise.resolve();
+    
+    // ✅ CHANGED: Return the updated day directly from memory
+    return Promise.resolve(updatedDay);
   }
 
   // ── XP ──────────────────────────────────────────────────────────────────────

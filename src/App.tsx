@@ -1,9 +1,12 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
+import { useEffect } from 'react';
 import { AuthProvider }    from './contexts/AuthContext';
 import { ToastProvider }   from './components/ToastProvider';
 import { ErrorBoundary }   from './components/ErrorBoundary';
 import ProtectedRoute      from './components/ProtectedRoute';
+import { initializePipelineDownstreamHandlers } from './services/pipelineDownstreamHandlers';
+import { useMilestoneUnlocks } from './hooks/useMilestoneUnlocks';
 import LandingPage         from './pages/LandingPage';
 import LoginPage           from './pages/LoginPage';
 import DashboardPage       from './pages/DashboardPage';
@@ -42,6 +45,14 @@ function AnimatedRoutes() {
 }
 
 function App() {
+  // Initialize execution pipeline downstream handlers once on app startup
+  useEffect(() => {
+    initializePipelineDownstreamHandlers();
+  }, []);
+
+  // Initialize milestone unlock handlers
+  useMilestoneUnlocks();
+
   return (
     <ErrorBoundary>
       <AuthProvider>

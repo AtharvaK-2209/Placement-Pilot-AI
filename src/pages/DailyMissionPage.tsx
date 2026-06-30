@@ -14,8 +14,9 @@ import { useLocation, useNavigate }          from 'react-router-dom';
 import {
   ArrowLeft, AlertTriangle, BookOpen, Code2, RotateCcw,
   Trophy, Sparkles, Clock, CheckSquare, Square, Briefcase,
-  Flame, Star, Zap,
+  Star,
 } from 'lucide-react';
+import { AuthenticatedLayout } from '../components/AuthenticatedLayout';
 import { Button } from '../components/Button';
 import { NoMissionEmptyState } from '../components/EmptyState';
 import type { DailyMission, MissionTask }  from '../ai/dailyMission/dailyMission.schema';
@@ -23,6 +24,7 @@ import type { RoadmapWeek }                from '../ai/schemas/roadmap.schema';
 import { generateDailyMission, formatMinutes } from '../ai/dailyMission/dailyMission';
 import { useDayProgress }                  from '../hooks/useProgress';
 import { useMissionRepository }            from '../hooks/useMissionRepository';
+import { executionPipelineEvents }         from '../services/executionPipelineEvents';
 import type { Achievement }                from '../types/progress';
 
 // ─── Router state ──────────────────────────────────────────────────────────────
@@ -199,6 +201,17 @@ export default function DailyMissionPage() {
   // Progress hook — only active when a mission is loaded
   const { state: ps, toggleTask, recordMissionGenerated, clearNewlyUnlocked } =
     useDayProgress(state?.week.week ?? 1, dayNumber, mission, roadmapTitle, totalWeeks);
+  
+  // DIAGNOSTIC: Check if ps.dayProgress is updating correctly
+  console.log(`[DailyMissionPage] DIAGNOSTIC - ps.dayProgress:`, {
+    exists: !!ps.dayProgress,
+    tasksCount: ps.dayProgress?.tasks.length,
+    firstTask: ps.dayProgress?.tasks[0] ? {
+      title: ps.dayProgress.tasks[0].taskTitle,
+      completed: ps.dayProgress.tasks[0].completed
+    } : null,
+    loading: ps.loading
+  });
 
   // Show achievement toasts
   useEffect(() => {
@@ -289,6 +302,17 @@ export default function DailyMissionPage() {
         // Record that this mission was generated for roadmap progress tracking
         await recordMissionGenerated(week.week, dayNumber);
         console.log(`[DailyMissionPage] ✓ Mission generation tracked in roadmap progress`);
+
+        // Emit milestone event for first mission generation
+        // Check if this is the first mission ever generated for the user
+        if (week.week === 1 && dayNumber === 1) {
+          console.log('[DailyMissionPage] ✓ First mission generated, emitting milestone event');
+          await executionPipelineEvents.emit({
+            type: 'first_mission_generated',
+            timestamp: new Date().toISOString(),
+            data: { missionTitle: result.data.title, week: week.week, day: dayNumber },
+          });
+        }
       } else {
         console.error(`[DailyMissionPage] Mission generation failed:`, result);
         setGenError(true);
@@ -321,34 +345,19 @@ export default function DailyMissionPage() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-bg-primary font-sans text-text-primary">
+    <AuthenticatedLayout noPadding maxWidth="full">
+      <div className="min-h-screen bg-bg-primary font-sans text-text-primary">
 
       {/* Achievement toast */}
       {toastQueue.length > 0 && (
         <AchievementToast achievement={toastQueue[0]} onClose={() => setToastQueue((q) => q.slice(1))} />
       )}
 
-      {/* ── Top bar ── */}
-      <header className="sticky top-0 z-40 border-b border-white/5 bg-bg-primary/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-          <button onClick={() => navigate('/roadmap')} className="flex items-center gap-2 text-sm text-text-secondary transition-colors duration-200 hover:text-text-primary">
-            <ArrowLeft size={16} /> Back to Roadmap
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent">
-              <Zap size={11} />{ps.totalXP} XP
-            </div>
-            {ps.streak.currentStreak > 0 && (
-              <div className="flex items-center gap-1 rounded-full border border-warning/20 bg-warning/10 px-3 py-1 text-xs font-semibold text-warning">
-                <Flame size={11} />{ps.streak.currentStreak}
-              </div>
-            )}
-            <span className="text-sm font-semibold">PlacementPilot <span className="text-accent">AI</span></span>
-          </div>
-        </div>
-      </header>
-
       <main className="mx-auto max-w-4xl px-6 py-12">
+        {/* Contextual navigation */}
+        <button onClick={() => navigate('/roadmap')} className="mb-8 flex items-center gap-2 text-sm text-text-secondary transition-colors duration-200 hover:text-text-primary">
+          <ArrowLeft size={16} /> Back to Roadmap
+        </button>
 
         {/* ── Hero ── */}
         <div className="mb-10 animate-fade-up">
@@ -461,13 +470,25 @@ export default function DailyMissionPage() {
               <Card>
                 <SectionHeading icon={<BookOpen size={15} />}>Learning</SectionHeading>
                 <div className="flex flex-col gap-2">
-                  {mission.learningTasks.map((task) => {
+                  {mission.learningTasks.map((task, index) => {
                     const tc = dp?.tasks.find((t) => t.taskTitle === task.title);
+                    const completed = tc?.completed ?? false;
+                    
+                    // DIAGNOSTIC: Log the exact completed value being used
+                    if (index === 0) {
+                      console.log(`[DailyMissionPage] DIAGNOSTIC - First Learning task "${task.title}":`, {
+                        foundInDp: !!tc,
+                        completedValue: completed,
+                        dpTasksCount: dp?.tasks.length,
+                        dpExists: !!dp
+                      });
+                    }
+                    
                     return <TaskRow 
-                      key={`${task.title}-${tc?.completed ?? false}`} 
+                      key={task.title} 
                       task={task} 
-                      completed={tc?.completed ?? false}
-                      onToggle={() => toggleTask(task.title, tc?.completed ?? false)} 
+                      completed={completed}
+                      onToggle={() => toggleTask(task.title, completed)} 
                     />;
                   })}
                 </div>
@@ -481,11 +502,12 @@ export default function DailyMissionPage() {
                 <div className="flex flex-col gap-2">
                   {mission.practiceTasks.map((task) => {
                     const tc = dp?.tasks.find((t) => t.taskTitle === task.title);
+                    const completed = tc?.completed ?? false;
                     return <TaskRow 
-                      key={`${task.title}-${tc?.completed ?? false}`} 
+                      key={task.title} 
                       task={task} 
-                      completed={tc?.completed ?? false}
-                      onToggle={() => toggleTask(task.title, tc?.completed ?? false)} 
+                      completed={completed}
+                      onToggle={() => toggleTask(task.title, completed)} 
                     />;
                   })}
                 </div>
@@ -499,11 +521,12 @@ export default function DailyMissionPage() {
                 <div className="flex flex-col gap-2">
                   {mission.revisionTasks.map((task) => {
                     const tc = dp?.tasks.find((t) => t.taskTitle === task.title);
+                    const completed = tc?.completed ?? false;
                     return <TaskRow 
-                      key={`${task.title}-${tc?.completed ?? false}`} 
+                      key={task.title} 
                       task={task} 
-                      completed={tc?.completed ?? false}
-                      onToggle={() => toggleTask(task.title, tc?.completed ?? false)} 
+                      completed={completed}
+                      onToggle={() => toggleTask(task.title, completed)} 
                     />;
                   })}
                 </div>
@@ -555,5 +578,6 @@ export default function DailyMissionPage() {
 
       </main>
     </div>
+    </AuthenticatedLayout>
   );
 }

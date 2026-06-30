@@ -31,6 +31,7 @@ import {
   Trophy, CheckCircle2, XCircle, Code2, Briefcase,
   Star,
 } from 'lucide-react';
+import { AuthenticatedLayout } from '../components/AuthenticatedLayout';
 import { Button } from '../components/Button';
 import { FutureYouSkeleton } from '../components/SkeletonLoader';
 import { NoFuturePredictionEmptyState } from '../components/EmptyState';
@@ -332,9 +333,10 @@ export default function FutureYouPage() {
   ] : [];
 
   return (
-    <div className="min-h-screen bg-bg-primary pb-24">
+    <AuthenticatedLayout noPadding maxWidth="full">
+      <div className="min-h-screen bg-bg-primary pb-24">
       {/* ── Header ── */}
-      <div className="sticky top-0 z-10 border-b border-white/5 bg-bg-primary/80 backdrop-blur-md">
+      <div className="border-b border-white/5 bg-bg-primary">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
             <button
@@ -648,5 +650,6 @@ export default function FutureYouPage() {
         )}
       </div>
     </div>
+    </AuthenticatedLayout>
   );
 }

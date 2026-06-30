@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { GamificationService } from '../services/gamificationService';
 import type { GamificationState } from '../services/gamificationService';
 import { getProgressRepository } from '../repositories/index';
+import { executionPipelineEvents } from '../services/executionPipelineEvents';
 
 export interface UseGamificationState {
   data: GamificationState | null;
@@ -73,6 +74,36 @@ export function useGamification(): UseGamificationState {
 
   useEffect(() => {
     fetchGamificationData();
+
+    // Subscribe to execution pipeline events to keep gamification state in sync
+    // These events are emitted when the user completes tasks, earns XP, etc.
+    const unsubscribeTaskCompleted = executionPipelineEvents.subscribe('task_completed', async () => {
+      console.log('[useGamification] Received task_completed event, refreshing gamification state');
+      await fetchGamificationData();
+    });
+
+    const unsubscribeDayCompleted = executionPipelineEvents.subscribe('day_completed', async () => {
+      console.log('[useGamification] Received day_completed event, refreshing gamification state');
+      await fetchGamificationData();
+    });
+
+    const unsubscribeXPAwarded = executionPipelineEvents.subscribe('xp_awarded', async () => {
+      console.log('[useGamification] Received xp_awarded event, refreshing gamification state');
+      await fetchGamificationData();
+    });
+
+    const unsubscribeProgressUpdated = executionPipelineEvents.subscribe('progress_updated', async () => {
+      console.log('[useGamification] Received progress_updated event, refreshing gamification state');
+      await fetchGamificationData();
+    });
+
+    // Cleanup: unsubscribe from events on unmount
+    return () => {
+      unsubscribeTaskCompleted();
+      unsubscribeDayCompleted();
+      unsubscribeXPAwarded();
+      unsubscribeProgressUpdated();
+    };
   }, [user]);
 
   return {

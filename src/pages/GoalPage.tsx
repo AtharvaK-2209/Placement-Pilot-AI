@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, X, Loader2 } from 'lucide-react';
+import { AuthenticatedLayout } from '../components/AuthenticatedLayout';
 import type {
   GoalInput,
   GoalType,
@@ -9,6 +10,7 @@ import type {
   Skill,
 } from '../types/goal';
 import { analyzeGoal } from '../ai/goalAnalysis';
+import { executionPipelineEvents } from '../services/executionPipelineEvents';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -117,33 +119,36 @@ export default function GoalPage() {
     const result = await analyzeGoal(goalInput);
     setLoading(false);
 
+    // Emit milestone event for goal analysis completion
+    if (result.success && result.data) {
+      console.log('[GoalPage] ✓ Goal analysis successful, emitting milestone event');
+      await executionPipelineEvents.emit({
+        type: 'goal_analysis_complete',
+        timestamp: new Date().toISOString(),
+        data: { goal: goalInput.goal },
+      });
+    }
+
     navigate('/analysis', { state: { result, goalInput } });
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-bg-primary font-sans text-text-primary">
-
-      {/* ── Top bar ── */}
-      <header className="sticky top-0 z-40 border-b border-white/5 bg-bg-primary/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-sm text-text-secondary transition-colors hover:text-text-primary"
-          >
-            <ArrowLeft size={16} />
-            Back
-          </button>
-          <span className="text-sm font-semibold text-text-primary">
-            PlacementPilot <span className="text-accent">AI</span>
-          </span>
-        </div>
-      </header>
+    <AuthenticatedLayout noPadding maxWidth="full">
+      <div className="min-h-screen bg-bg-primary font-sans text-text-primary">
 
       {/* ── Form ── */}
       <main className="mx-auto max-w-3xl px-6 py-12">
+        {/* Contextual navigation */}
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="mb-8 flex items-center gap-2 text-sm text-text-secondary transition-colors hover:text-text-primary"
+        >
+          <ArrowLeft size={16} />
+          Back
+        </button>
 
         {/* Page heading */}
         <div className="mb-10">
@@ -351,5 +356,6 @@ export default function GoalPage() {
         </form>
       </main>
     </div>
+    </AuthenticatedLayout>
   );
 }
