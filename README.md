@@ -529,7 +529,7 @@ This project was built for the **Google Developer Groups (GDG) x Coding Ninjas H
 
 ---
 
-### Acknowledgments
+## Acknowledgments
 
 - **Google Gemini Team** - For the amazing AI capabilities
 - **Firebase Team** - For robust backend infrastructure
@@ -541,8 +541,8 @@ This project was built for the **Google Developer Groups (GDG) x Coding Ninjas H
 ## 📞 Contact & Links
 
 - **Email**: atharvakalam2209@gmail.com
-- **GitHub Repository**: [https://github.com/yourusername/placement-pilot-ai](https://github.com/yourusername/placement-pilot-ai)
-- **Documentation**: [docs/](https://docs.google.com/document/d/1kuGK1GSW0syCpu_wWyJ_VjEInNXxtdQzRGILvFDKRWA/edit?tab=t.0)
+- **GitHub Repository**: [Github Repo](https://github.com/yourusername/placement-pilot-ai)
+- **Documentation**: [docs](https://docs.google.com/document/d/1kuGK1GSW0syCpu_wWyJ_VjEInNXxtdQzRGILvFDKRWA/edit?tab=t.0)
 - **Report Issues**: [GitHub Issues](https://github.com/yourusername/placement-pilot-ai/issues)
 
 ---
