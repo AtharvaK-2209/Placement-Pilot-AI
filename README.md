@@ -109,10 +109,8 @@ This project is built entirely on **Google Cloud & AI ecosystem**:
 | **Gemini 2.5 Flash** | Primary model for fast, cost-effective inference | Optimized response time |
 | **Firebase Authentication** | User authentication (Google SSO, email/password) | Secure user management |
 | **Cloud Firestore** | NoSQL database for real-time data persistence | Cross-device synchronization |
-| **Google AI Studio** | Model testing and prompt engineering | Development workflow |
 | **Firebase Hosting** | Static site deployment (optional) | Production deployment |
 
-**Google Integration Score**: 100% (All core features use Google technologies)
 
 ---
 
