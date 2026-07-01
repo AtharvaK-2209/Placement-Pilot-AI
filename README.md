@@ -14,7 +14,7 @@
 ## 📋 Table of Contents
 
 - [Problem Statement](#-problem-statement)
-- [Solution](#-solution)  1 qaqazzzzzxq55555tffc
+- [Solution](#-solution) 
 - [Key Features](#-key-features)
 - [Google Technologies Used](#-google-technologies-used)
 - [Architecture](#-architecture)
@@ -209,24 +209,52 @@ Dashboard & Progress Visualization
 ## 📸 Screenshots
 
 ### 🏠 Landing Page
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Landing%20Page/1.png?raw=true)
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Landing%20Page/2.png?raw=true)
+
 > Clean, modern landing page with clear value proposition
 
 ### 📊 Dashboard
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Dashboard/1.png?raw=true)
+
 > Progress overview with XP rings, streaks, and goal health
 
+### 🎯 Goal Analysis
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Goal%20Analysis/1.png?raw=true)
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Goal%20Analysis/2.png?raw=true)
+
+
 ### 🗺️ Roadmap View
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Roadmap%20View/1.png?raw=true)
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Roadmap%20View/2.png?raw=true)
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Roadmap%20View/3.png?raw=true)
+
 > Week-by-week learning path with milestones
 
 ### ✅ Daily Missions
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Daily%20Missions/1.png?raw=true)
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Daily%20Missions/2.png?raw=true)
+
 > Today's executable tasks with XP rewards
 
 ### 💚 Goal Health Monitor
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Goal%20Health%20Monitor/1.png?raw=true)
+
 > Real-time health tracking with AI insights
 
 ### 🔮 Future You Prediction
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Future%20You%20Prediction/1.png?raw=true)
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Future%20You%20Prediction/2.png?raw=true)
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Future%20You%20Prediction/3.png?raw=true)
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Future%20You%20Prediction/4.png?raw=true)
+
 > AI-powered career readiness forecast
 
 ### 🏆 Achievements
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Achievements/1.png?raw=true)
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Achievements/2.png?raw=true)
+![image alt](https://github.com/AtharvaK-2209/Placement-Pilot-AI/blob/main/Screenshots/Achievements/3.png?raw=true)
+
 > Badge gallery with animated unlock effects
 
 ---
