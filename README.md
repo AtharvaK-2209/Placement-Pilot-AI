@@ -527,6 +527,7 @@ If user falls behind:
 
 This project was built for the **Google Developer Groups (GDG) x Coding Ninjas Hackathon - Vibe2Ship**.
 
+---
 
 ### Acknowledgments
 
