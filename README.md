@@ -1,6 +1,5 @@
 # 🎯 PlacementPilot AI
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19.2-61dafb)](https://reactjs.org/)
 [![Firebase](https://img.shields.io/badge/Firebase-12.15-orange)](https://firebase.google.com/)
@@ -9,7 +8,6 @@
 
 > **AI-powered placement preparation platform that converts career goals into adaptive execution roadmaps using Google Gemini.**
 
-[🚀 Live Demo](#) • [📖 Documentation](#documentation) • [🎥 Video Demo](#)
 
 ---
 
@@ -27,8 +25,6 @@
 - [Folder Structure](#-folder-structure)
 - [How It Works](#-how-it-works)
 - [Future Scope](#-future-scope)
-- [Contributors](#-contributors)
-- [License](#-license)
 
 ---
 
@@ -503,13 +499,8 @@ If user falls behind:
 
 ## 👥 Contributors
 
-This project was built for the **Google Developer Groups (GDG) x Coding Ninjas Hackathon**.
+This project was built for the **Google Developer Groups (GDG) x Coding Ninjas Hackathon - Vibe2Ship**.
 
-### Team
-
-- **[Your Name]** - Full Stack Developer, AI Integration
-- **[Team Member 2]** - Frontend Developer, UI/UX
-- **[Team Member 3]** - Backend Developer, Firebase Integration
 
 ### Acknowledgments
 
@@ -520,41 +511,11 @@ This project was built for the **Google Developer Groups (GDG) x Coding Ninjas H
 
 ---
 
-## 📄 License
-
-This project is licensed under the **MIT License**.
-
-```
-MIT License
-
-Copyright (c) 2026 PlacementPilot AI Team
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
 ## 📞 Contact & Links
 
+- **Email**: atharvakalam2209@gmail.com
 - **GitHub Repository**: [https://github.com/yourusername/placement-pilot-ai](https://github.com/yourusername/placement-pilot-ai)
-- **Live Demo**: [https://placement-pilot-ai.web.app](https://placement-pilot-ai.web.app)
-- **Documentation**: [docs/](docs/)
+- **Documentation**: [docs/](https://docs.google.com/document/d/1kuGK1GSW0syCpu_wWyJ_VjEInNXxtdQzRGILvFDKRWA/edit?tab=t.0)
 - **Report Issues**: [GitHub Issues](https://github.com/yourusername/placement-pilot-ai/issues)
 
 ---
