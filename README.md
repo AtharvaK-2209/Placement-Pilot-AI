@@ -259,93 +259,6 @@ Dashboard & Progress Visualization
 
 ---
 
-## 🚀 Getting Started
-
-### Prerequisites
-
-- **Node.js** 18+ and npm
-- **Firebase Project** with Firestore and Authentication enabled
-- **Google Gemini API Key** from [Google AI Studio](https://aistudio.google.com/)
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/placement-pilot-ai.git
-   cd placement-pilot-ai
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Set up environment variables**
-   
-   Create a `.env` file in the project root (see [Environment Variables](#-environment-variables) section)
-
-4. **Run development server**
-   ```bash
-   npm run dev
-   ```
-
-5. **Open in browser**
-   
-   Navigate to `http://localhost:5173`
-
-### Build for Production
-
-```bash
-npm run build
-```
-
-The production build will be in the `dist/` directory.
-
-### Preview Production Build
-
-```bash
-npm run preview
-```
-
----
-
-## 🔐 Environment Variables
-
-Create a `.env` file in the project root with the following variables:
-
-```env
-# Firebase Configuration
-VITE_FIREBASE_API_KEY=your_firebase_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
-
-# Google Gemini AI
-VITE_GEMINI_API_KEY=your_gemini_api_key
-```
-
-### How to Get API Keys
-
-1. **Firebase Configuration**:
-   - Go to [Firebase Console](https://console.firebase.google.com/)
-   - Create a new project or select existing
-   - Enable Authentication (Google, Email/Password)
-   - Enable Firestore Database
-   - Go to Project Settings → General → Your apps
-   - Copy the config values
-
-2. **Gemini API Key**:
-   - Visit [Google AI Studio](https://aistudio.google.com/)
-   - Sign in with Google account
-   - Click "Get API Key"
-   - Create a new API key or use existing
-
-⚠️ **Security Note**: Never commit `.env` file to version control. The `.gitignore` file already excludes it.
-
----
-
 ## 📁 Folder Structure
 
 ```
@@ -501,18 +414,10 @@ If user falls behind:
 - [ ] **Peer Comparison**: Anonymous benchmarking with similar learners
 - [ ] **Interview Prep Mode**: Mock interview scheduling with AI feedback
 - [ ] **Resource Recommendations**: Curated resources based on progress
-- [ ] **Mobile App**: React Native mobile application
-- [ ] **Voice Commands**: Voice-based task completion
-- [ ] **Chrome Extension**: Quick task logging from LeetCode/GitHub
-- [ ] **Team Mode**: Study groups with collaborative roadmaps
-- [ ] **Company-Specific Paths**: Tailored roadmaps for target companies
-- [ ] **Resume Builder**: AI-powered resume optimization
-- [ ] **Job Application Tracker**: Integrated job search management
 - [ ] **Notification System**: Smart reminders and deadline alerts
 
 ### Technical Improvements
 
-- [ ] Offline Mode with service workers
 - [ ] Advanced caching strategies
 - [ ] Performance monitoring with Firebase Analytics
 - [ ] A/B testing for feature optimization
@@ -544,7 +449,7 @@ This project was built for the **Google Developer Groups (GDG) x Coding Ninjas H
 - **GitHub Repository**: [Github Repo](https://github.com/yourusername/placement-pilot-ai)
 - **Documentation**: [docs](https://docs.google.com/document/d/1kuGK1GSW0syCpu_wWyJ_VjEInNXxtdQzRGILvFDKRWA/edit?tab=t.0)
 - **Report Issues**: [GitHub Issues](https://github.com/yourusername/placement-pilot-ai/issues)
-
+- **Website Link**: [PlacementPilot AI](https://placement-pilot-ai.web.app/)
 ---
 
 <div align="center">
