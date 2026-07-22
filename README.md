@@ -20,8 +20,6 @@
 - [Architecture](#-architecture)
 - [Tech Stack](#-tech-stack)
 - [Screenshots](#-screenshots)
-- [Getting Started](#-getting-started)
-- [Environment Variables](#-environment-variables)
 - [Folder Structure](#-folder-structure)
 - [How It Works](#-how-it-works)
 - [Future Scope](#-future-scope)
